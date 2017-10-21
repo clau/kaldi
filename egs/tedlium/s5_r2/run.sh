@@ -20,11 +20,11 @@
 . ./cmd.sh
 . ./path.sh
 
-
+echoerr() { echo "$@" 1>&2; }
 set -e -o pipefail -u
 
-nj=35
-decode_nj=30   # note: should not be >38 which is the number of speakers in the dev set
+nj=8
+decode_nj=4    # note: should not be >38 which is the number of speakers in the dev set
                # after applying --seconds-per-spk-max 180.  We decode with 4 threads, so
                # this will be too many jobs if you're using run.pl.
 stage=0
@@ -36,6 +36,8 @@ if [ $stage -le 0 ]; then
   local/download_data.sh
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 1 ]; then
   local/prepare_data.sh
   # Split speakers up into 3-minute chunks.  This doesn't hurt adaptation, and
@@ -47,15 +49,21 @@ if [ $stage -le 1 ]; then
   done
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 2 ]; then
   local/prepare_dict.sh
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 3 ]; then
   utils/prepare_lang.sh data/local/dict_nosp \
     "<unk>" data/local/lang_nosp data/lang_nosp
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 4 ]; then
   # later on we'll change this script so you have the option to
   # download the pre-built LMs from openslr.org instead of building them
@@ -63,19 +71,25 @@ if [ $stage -le 4 ]; then
   local/ted_train_lm.sh
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 5 ]; then
   local/format_lms.sh
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 # Feature extraction
 if [ $stage -le 6 ]; then
   for set in test dev train; do
     dir=data/$set
-    steps/make_mfcc.sh --nj 30 --cmd "$train_cmd" $dir
+    steps/make_mfcc.sh --nj $nj --cmd "$train_cmd" $dir
     steps/compute_cmvn_stats.sh $dir
   done
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 # Now we have 212 hours of training data.
 # Well create a subset with 10k short segments to make flat-start training easier:
 if [ $stage -le 7 ]; then
@@ -83,12 +97,16 @@ if [ $stage -le 7 ]; then
   utils/data/remove_dup_utts.sh 10 data/train_10kshort data/train_10kshort_nodup
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 # Train
 if [ $stage -le 8 ]; then
-  steps/train_mono.sh --nj 20 --cmd "$train_cmd" \
+  steps/train_mono.sh --nj $nj --cmd "$train_cmd" \
     data/train_10kshort_nodup data/lang_nosp exp/mono
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 9 ]; then
   steps/align_si.sh --nj $nj --cmd "$train_cmd" \
     data/train data/lang_nosp exp/mono exp/mono_ali
@@ -96,6 +114,8 @@ if [ $stage -le 9 ]; then
     2500 30000 data/train data/lang_nosp exp/mono_ali exp/tri1
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 10 ]; then
   utils/mkgraph.sh data/lang_nosp exp/tri1 exp/tri1/graph_nosp
 
@@ -109,6 +129,8 @@ if [ $stage -le 10 ]; then
   done
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 11 ]; then
   steps/align_si.sh --nj $nj --cmd "$train_cmd" \
     data/train data/lang_nosp exp/tri1 exp/tri1_ali
@@ -117,6 +139,8 @@ if [ $stage -le 11 ]; then
     4000 50000 data/train data/lang_nosp exp/tri1_ali exp/tri2
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 12 ]; then
   utils/mkgraph.sh data/lang_nosp exp/tri2 exp/tri2/graph_nosp
   for dset in dev test; do
@@ -127,6 +151,8 @@ if [ $stage -le 12 ]; then
   done
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 13 ]; then
   steps/get_prons.sh --cmd "$train_cmd" data/train data/lang_nosp exp/tri2
   utils/dict_dir_add_pronprobs.sh --max-normalize true \
@@ -135,6 +161,8 @@ if [ $stage -le 13 ]; then
     exp/tri2/pron_bigram_counts_nowb.txt data/local/dict
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 14 ]; then
   utils/prepare_lang.sh data/local/dict "<unk>" data/local/lang data/lang
   cp -rT data/lang data/lang_rescore
@@ -151,6 +179,8 @@ if [ $stage -le 14 ]; then
   done
 fi
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 15 ]; then
   steps/align_si.sh --nj $nj --cmd "$train_cmd" \
     data/train data/lang exp/tri2 exp/tri2_ali
@@ -172,6 +202,8 @@ fi
 # and decode with that.
 # local/run_unk_model.sh
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 16 ]; then
   # this does some data-cleaning.  It actually degrades the GMM-level results
   # slightly, but the cleaned data should be useful when we add the neural net and chain
@@ -182,6 +214,8 @@ fi
 
 # TODO: xiaohui-zhang will add lexicon cleanup at some point.
 
+echo "6998:Completed stage: $stage..."
+echoerr "6998:Completed stage: $stage..."
 if [ $stage -le 17 ]; then
   # This will only work if you have GPUs on your system (and note that it requires
   # you to have the queue set up the right way... see kaldi-asr.org/doc/queue.html)

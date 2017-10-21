@@ -825,7 +825,7 @@ unset MKLLIBDIR
 unset HOST
 
 # These environment variables can be used to override the default toolchain.
-CXX=${CXX:-g++}
+CXX=${CXX:-g++-4.9}
 AR=${AR:-ar}
 AS=${AS:-as}
 RANLIB=${RANLIB:-ranlib}
