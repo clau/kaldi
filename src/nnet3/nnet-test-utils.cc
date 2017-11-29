@@ -35,11 +35,12 @@ void GenerateConfigSequenceSimplest(
     std::vector<std::string> *configs) {
   std::ostringstream os;
 
-  int32 input_dim = 10 + Rand() % 20,
-      output_dim = (opts.output_dim > 0 ?
-                    opts.output_dim :
-                    100 + Rand() % 200);
-
+  // int32 input_dim = 10 + Rand() % 20,
+  //     output_dim = (opts.output_dim > 0 ?
+  //                   opts.output_dim :
+  //                   100 + Rand() % 200);
+  int32 input_dim = 3,
+        output_dim = 6;
 
   os << "component name=affine1 type=AffineComponent input-dim="
      << input_dim << " output-dim=" << output_dim << std::endl;

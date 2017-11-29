@@ -37,7 +37,7 @@ std::string PrintCommand(int32 num_commands,
 
 
 void UnitTestNnetAnalyze() {
-  for (int32 n = 0; n < 20; n++) {
+  for (int32 n = 0; n < 1; n++) {
     struct NnetGenerationOptions gen_config;
 
     std::vector<std::string> configs;
