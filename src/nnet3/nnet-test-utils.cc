@@ -1204,6 +1204,7 @@ void GenerateConfigSequence(
     std::vector<std::string> *configs) {
 start:
   int32 network_type = RandInt(0, 14);
+  network_type = 0;
   switch(network_type) {
     case 0:
       GenerateConfigSequenceSimplest(opts, configs);
