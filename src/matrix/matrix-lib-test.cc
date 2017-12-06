@@ -3121,7 +3121,7 @@ template<typename Real> static void UnitTestLsfl() {
   // Hg = np.dot(H, g)
   Vector<Real> Hg(3);
   Hg.SetZero();
-  Hg.AddVecVec(1.0, H, s, 0.0); 
+  Hg.AddMatVec(1.0, H, kNoTrans, s, 0.0);
   AssertEqual(Hg(0), 14);
   AssertEqual(Hg(1), 28);
   AssertEqual(Hg(2), 42);
