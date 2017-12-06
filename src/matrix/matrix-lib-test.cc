@@ -3094,6 +3094,39 @@ template<typename Real> static void UnitTestMaxAbsEig() {
   }
 }
 
+template<typename Real> static void UnitTestLsfl() {
+  Vector<Real> s(3);
+  s(0) = 1.0;
+  s(1) = 2.0;
+  s(2) = 3.0;
+
+  // inner = s'g = np.inner(s, g)
+  Real inner = VecVec(s, s);
+  AssertEqual(inner, 14.0);
+
+  // H = ss' = np.outer(s, s)
+  Matrix<Real> H(3, 3);
+  H.SetZero();
+  H.AddVecVec(1.0, s, s);
+  AssertEqual(H(0, 0), 1);
+  AssertEqual(H(0, 1), 2);
+  AssertEqual(H(0, 2), 3);
+  AssertEqual(H(1, 0), 2);
+  AssertEqual(H(1, 1), 4);
+  AssertEqual(H(1, 2), 6);
+  AssertEqual(H(2, 0), 3);
+  AssertEqual(H(2, 1), 6);
+  AssertEqual(H(2, 2), 9);
+
+  // Hg = np.dot(H, g)
+  Vector<Real> Hg(3);
+  Hg.SetZero();
+  Hg.AddVecVec(1.0, H, s, 0.0); 
+  AssertEqual(Hg(0), 14);
+  AssertEqual(Hg(1), 28);
+  AssertEqual(Hg(2), 42);
+}
+
 template<typename Real> static void UnitTestLbfgs() {
   MatrixIndexT temp = g_kaldi_verbose_level;
   g_kaldi_verbose_level = 4;
@@ -4541,6 +4574,7 @@ template<typename Real> static void MatrixUnitTest(bool full_test) {
   UnitTestFloorChol<Real>();
   UnitTestFloorUnit<Real>();
   UnitTestAddMat2Sp<Real>();
+  UnitTestLsfl<Real>();
   UnitTestLbfgs<Real>();
   // UnitTestSvdBad<Real>(); // test bug in Jama SVD code.
   UnitTestCompressedMatrix<Real>();
