@@ -162,7 +162,7 @@ class OptimizeLsfl {
                const VectorBase<Real> &gradient);
   void ComputeNewDirection(Real function_value,
                            const VectorBase<Real> &gradient);
-  void ComputeHifNeeded(const VectorBase<Real> &gradient);
+  void EstimateInverseHessian(const VectorBase<Real> &gradient);
   void StepSizeIteration(Real function_value,
                          const VectorBase<Real> &gradient);
   
