@@ -104,7 +104,7 @@ void OptimizeLsfl<Real>::EstimateInverseHessian(const VectorBase<Real> &gradient
     v.AddVec(-1.0 / gHg, Hg);
     v.Scale(std::sqrt(gHg));
 
-    Real u = opts.phi * (VecVec(grad, x) / VecVec(grad, Hg)) + (1.0 - opts.phi) * xg / gHg;
+    Real u = opts.phi * (VecVec(gradient, x) / VecVec(gradient, Hg)) + (1.0 - opts.phi) * xg / gHg;
 
     // H = u * (H - np.dot(Hg, VecVec(g, H)) / gHg + theta * np.outer(v, v)) + xx / xg
     Matrix<Real> new_H(H_);
