@@ -132,27 +132,49 @@ void NnetChainCombiner::Combine() {
     SelfTestModelDerivatives();
   }
 
+  // int32 dim = ParameterDim();
+  // LbfgsOptions lbfgs_options;
+  // lbfgs_options.minimize = false; // We're maximizing.
+  // lbfgs_options.m = dim; // Store the same number of vectors as the dimension
+  //                        // itself, so this is BFGS.
+  // lbfgs_options.first_step_impr = combine_config_.initial_impr;
+
+  // Vector<double> params(dim), deriv(dim);
+  // double objf, initial_objf;
+  // GetInitialParameters(&params);
+
+
+  // OptimizeLbfgs<double> lbfgs(params, lbfgs_options);
+
+  // for (int32 i = 0; i < combine_config_.num_iters; i++) {
+  //   params.CopyFromVec(lbfgs.GetProposedValue());
+  //   objf = ComputeObjfAndDerivFromParameters(params, &deriv);
+  //   KALDI_VLOG(2) << "Iteration " << i << " params = " << params
+  //                 << ", objf = " << objf << ", deriv = " << deriv;
+  //   if (i == 0) initial_objf = objf;
+  //   lbfgs.DoStep(objf, deriv);
+  // }
+
   int32 dim = ParameterDim();
-  LbfgsOptions lbfgs_options;
-  lbfgs_options.minimize = false; // We're maximizing.
-  lbfgs_options.m = dim; // Store the same number of vectors as the dimension
-                         // itself, so this is BFGS.
-  lbfgs_options.first_step_impr = combine_config_.initial_impr;
+  LsflOptions lsfl_options;
+  lsfl_options.minimize = false; // We're maximizing.
+  lsfl_options.m = dim; // Store the same number of vectors as the dimension
+                        // itself, so this is BFGS.
+  lsfl_options.first_step_impr = combine_config_.initial_impr;
 
   Vector<double> params(dim), deriv(dim);
   double objf, initial_objf;
   GetInitialParameters(&params);
 
-
-  OptimizeLbfgs<double> lbfgs(params, lbfgs_options);
+  OptimizeLsfl<double> lsfl(params, lsfl_options);
 
   for (int32 i = 0; i < combine_config_.num_iters; i++) {
-    params.CopyFromVec(lbfgs.GetProposedValue());
+    params.CopyFromVec(lsfl.GetProposedValue());
     objf = ComputeObjfAndDerivFromParameters(params, &deriv);
     KALDI_VLOG(2) << "Iteration " << i << " params = " << params
                   << ", objf = " << objf << ", deriv = " << deriv;
     if (i == 0) initial_objf = objf;
-    lbfgs.DoStep(objf, deriv);
+    lsfl.DoStep(objf, deriv);
   }
 
   if (!combine_config_.sum_to_one_penalty) {
@@ -170,11 +192,10 @@ void NnetChainCombiner::Combine() {
               << (objf - penalty) << " + " << penalty;
   }
 
-
   // must recompute nnet_ if "params" is not exactly equal to the
   // final params that LB
   Vector<double> final_params(dim);
-  final_params.CopyFromVec(lbfgs.GetValue(&objf));
+  final_params.CopyFromVec(lsfl.GetValue(&objf));
   if (!params.ApproxEqual(final_params, 0.0)) {
     // the following call makes sure that nnet_ corresponds to the parameters
     // in "params".
