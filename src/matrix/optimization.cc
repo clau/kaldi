@@ -119,7 +119,7 @@ void OptimizeLsfl<Real>::EstimateInverseHessian(const VectorBase<Real> &gradient
     HggH.AddMatMatMat(1.0, H_, kNoTrans, gg, kNoTrans, H_, kNoTrans, 0.0);
 
     new_H.AddMat(-1.0 / gHg, HggH);
-    new_H.AddMat(opts.theta, vv);
+    new_H.AddMat(opts_.theta, vv);
     new_H.Scale(u);
     new_H.AddMat(1.0 / xg, xx);
 
