@@ -66,7 +66,134 @@ int32 LinearCgd(const LinearCgdOptions &opts,
 
 
 
+/**
+  Lsfl
+*/
 
+struct LsflOptions {
+  bool minimize; // if true, we're minimizing, else maximizing.
+  float first_step_learning_rate; // The very first step of L-BFGS is
+  // like gradient descent.  If you want to configure the size of that step,
+  // you can do it using this variable.
+  float first_step_length; // If this variable is >0.0, it overrides
+  // first_step_learning_rate; on the first step we choose an approximate
+  // Hessian that is the multiple of the identity that would generate this
+  // step-length, or 1.0 if the gradient is zero.
+  float first_step_impr; // If this variable is >0.0, it overrides
+  // first_step_learning_rate; on the first step we choose an approximate
+  // Hessian that is the multiple of the identity that would generate this
+  // amount of objective function improvement (assuming the "real" objf
+  // was linear).
+  float c1; // A constant in Armijo rule = Wolfe condition i)
+  float c2; // A constant in Wolfe condition ii)
+  float d; // An amount > 1.0 (default 2.0) that we initially multiply or
+  // divide the step length by, in the line search.
+  int max_line_search_iters; // after this many iters we restart L-BFGS.
+  int avg_step_length; // number of iters to avg step length over, in
+  // RecentStepLength().
+
+  float phi;
+  float theta;
+  
+  LsflOptions (bool minimize = true):
+      minimize(minimize),
+      first_step_learning_rate(1.0),
+      first_step_length(0.0),
+      first_step_impr(0.0),
+      c1(1.0e-04),
+      c2(0.9),
+      d(2.0),
+      max_line_search_iters(50),
+      avg_step_length(4)
+      phi(0.1)
+      theta(0.1) { }
+};
+
+template<typename Real>
+class OptimizeLsfl {
+ public:
+  /// Initializer takes the starting value of x.
+  OptimizeLsfl(const VectorBase<Real> &x,
+               const LsflOptions &opts);
+  
+  /// This returns the value of the variable x that has the best objective
+  /// function so far, and the corresponding objective function value if
+  /// requested.  This would typically be called only at the end.
+  const VectorBase<Real>& GetValue(Real *objf_value = NULL) const;
+  
+  /// This returns the value at which the function wants us
+  /// to compute the objective function and gradient.
+  const VectorBase<Real>& GetProposedValue() const { return new_x_; }
+  
+  /// The user calls this function to provide the class with the
+  /// function and gradient info at the point GetProposedValue().
+  /// If this point is outside the constraints you can set function_value
+  /// to {+infinity,-infinity} for {minimization,maximization} problems.
+  /// In this case the gradient, and also the second derivative (if you call
+  /// the second overloaded version of this function) will be ignored.
+  void DoStep(Real function_value,
+              const VectorBase<Real> &gradient);
+    
+ private:
+  KALDI_DISALLOW_COPY_AND_ASSIGN(OptimizeLsfl);
+
+
+  // The following variable says what stage of the computation we're at.
+  // Refer to Algorithm 7.5 (L-BFGS) of Nodecdal & Wright, "Numerical
+  // Optimization", 2nd edition.
+  // kBeforeStep means we're about to do
+  /// "compute p_k <-- - H_k \delta f_k" (i.e. Algorithm 7.4).
+  // kWithinStep means we're at some point within line search; note
+  // that line search is iterative so we can stay in this state more
+  // than one time on each iteration.
+  enum ComputationState {
+    kBeforeStep,
+    kWithinStep, // This means we're within the step-size computation, and
+    // have not yet done the 1st function evaluation.
+  };
+  
+  inline MatrixIndexT Dim() { return x_.Dim(); }
+
+  // The following are subroutines within DoStep():
+  bool AcceptStep(Real function_value,
+                  const VectorBase<Real> &gradient);
+  void Restart(const VectorBase<Real> &x,
+               Real function_value,
+               const VectorBase<Real> &gradient);
+  void ComputeNewDirection(Real function_value,
+                           const VectorBase<Real> &gradient);
+  void ComputeHifNeeded(const VectorBase<Real> &gradient);
+  void StepSizeIteration(Real function_value,
+                         const VectorBase<Real> &gradient);
+  
+  
+  LsflOptions opts_;
+  SignedMatrixIndexT k_; // Iteration number, starts from zero.  Gets set back to zero
+  // when we restart.
+  
+  ComputationState computation_state_;
+
+  Vector<Real> x_; // current x.
+  Vector<Real> new_x_; // the x proposed in the line search.
+  Vector<Real> best_x_; // the x with the best objective function so far
+                        // (either the same as x_ or something in the current line search.)
+  Vector<Real> deriv_; // The most recently evaluated derivative-- at x_k.
+  Vector<Real> temp_;
+
+  Real f_; // The function evaluated at x_k.
+  Real best_f_; // the best objective function so far.
+  Real d_; // a number d > 1.0, but during an iteration we may decrease this, when
+  // we switch between armijo and wolfe failures.
+
+  int num_wolfe_i_failures_; // the num times we decreased step size.
+  int num_wolfe_ii_failures_; // the num times we increased step size.
+  enum { kWolfeI, kWolfeII, kNone } last_failure_type_; // last type of step-search
+  // failure on this iter.
+  
+  Matrix<Real> H_; // Current inverse-Hessian estimate.  May be computed by this class itself,
+  // or provided by user using 2nd form of SetGradientInfo().
+
+};
 
 
 /**

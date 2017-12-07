@@ -28,6 +28,345 @@
 
 namespace kaldi {
 
+// LSFL
+
+template<typename Real>
+OptimizeLsfl<Real>::OptimizeLsfl(const VectorBase<Real> &x,
+                                 const LsflOptions &opts):
+    opts_(opts), k_(0), computation_state_(kBeforeStep) {
+  MatrixIndexT dim = x.Dim();
+  KALDI_ASSERT(dim > 0);
+  x_ = x; // this is the value of x_k
+  new_x_ = x;  // this is where we'll evaluate the function next.
+  deriv_.Resize(dim);
+  temp_.Resize(dim);
+  H_.Resize(dim, dim);
+  // Just set f_ to some invalid value, as we haven't yet set it.
+  f_ = (opts.minimize ? 1 : -1 ) * std::numeric_limits<Real>::infinity();
+  best_f_ = f_;
+  best_x_ = x_;
+}
+
+template<typename Real>
+void OptimizeLsfl<Real>::EstimateInverseHessian(const VectorBase<Real> &gradient) {
+  if (k_ == 0) {
+    // H was never set up.  Set it up for the first time.
+    Real learning_rate;
+    if (opts_.first_step_length > 0.0) { // this takes
+      // precedence over first_step_learning_rate, if set.
+      // We are setting up H for the first time.
+      Real gradient_length = gradient.Norm(2.0);
+      learning_rate = (gradient_length > 0.0 ?
+                       opts_.first_step_length / gradient_length :
+                       1.0);
+    } else if (opts_.first_step_impr > 0.0) {
+      Real gradient_length = gradient.Norm(2.0);
+      learning_rate = (gradient_length > 0.0 ?
+                opts_.first_step_impr / (gradient_length * gradient_length) :
+                1.0);
+    } else {
+      learning_rate = opts_.first_step_learning_rate;
+    }
+    KALDI_ASSERT(learning_rate > 0.0);
+    H_.SetUnit();
+    H_.Scale(opts_.minimize ? learning_rate : -learning_rate);
+
+  } else { // k_ > 0
+
+    MatrixIndexT dim = Dim();
+
+    // g = grad - grad_m1
+    Vector<Real> g(gradient);
+    g.AddVec(-1.0, deriv_);
+
+    // TODO: check
+    // x = step
+    Vector<Real> x(new_x_);
+    x.AddVec(-1.0, x_);
+
+    // xx = np.outer(x, x)
+    Matrix<Real> xx(dim, dim);
+    xx.AddVecVec(1.0, x, x);
+
+    // xg = np.dot(x, g)
+    Real xg = VecVec(x, g);
+
+    // Hg = np.dot(H, g) # grad-shape
+    Vector<Real> Hg(dim);
+    Hg.AddMatVec(1.0, H, kNoTrans, g, 0.0);
+
+    // Real gHg = np.inner(g, Hg) # scalar
+    Real gHg = VecVec(g, Hg);
+
+    // Real v = std::pow(gHg, 0.5) * (x / xg - Hg / gHg)
+    Vector<Real> v(x);
+    v.Scale(1.0 / xg);
+    v.AddVec(-1.0 / gHg, Hg);
+    v.Scale(std::sqrt(gHg));
+
+    Real u = opts.phi * (VecVec(grad, x) / VecVec(grad, Hg)) + (1.0 - opts.phi) * xg / gHg;
+
+    // H = u * (H - np.dot(Hg, VecVec(g, H)) / gHg + theta * np.outer(v, v)) + xx / xg
+    Matrix<Real> new_H(H_);
+
+    Matrix<Real> vv(dim, dim);
+    vv.AddVecVec(1.0, v, v);
+
+    Matrix<Real> gg(dim, dim);
+    gg.AddVecVec(1.0, g, g);
+
+    Matrix<Real> HggH(dim);
+    HggH.AddMatMatMat(1.0, H_, kNoTrans, gg, kNoTrans, H_, kNoTrans, 0.0);
+
+    new_H.AddMat(-1.0 / gHg, HggH);
+    new_H.AddMat(opts.theta, vv);
+    new_H.Scale(u)
+    new_H.AddMat(1.0 / xg, xx);
+
+    H_.CopyFromMat(new_H);
+  }
+}  
+
+template<typename Real>
+void OptimizeLsfl<Real>::ComputeNewDirection(Real function_value,
+                                             const VectorBase<Real> &gradient) {
+  KALDI_ASSERT(computation_state_ == kBeforeStep);
+  EstimateInverseHessian(gradient);
+
+  new_x_.SetZero();
+  new_x_.AddMatVec(-1.0, H_, kNoTrans, gradient, 0.0);
+
+  { // TEST.  Note, -r will be the direction.
+    Real dot = VecVec(gradient, new_x_);
+    if ((opts_.minimize && dot < 0) || (!opts_.minimize && dot > 0))
+      KALDI_WARN << "Step direction has the wrong sign!  Routine will fail.";
+  }
+
+  new_x_.Scale(-1.0);
+  new_x_.AddVec(1.0, x_);
+
+  deriv_.CopyFromVec(gradient);
+  f_ = function_value;
+  d_ = opts_.d;
+  num_wolfe_i_failures_ = 0;
+  num_wolfe_ii_failures_ = 0;
+  last_failure_type_ = kNone;
+  computation_state_ = kWithinStep;
+}
+
+
+template<typename Real>
+bool OptimizeLsfl<Real>::AcceptStep(Real function_value,
+                                    const VectorBase<Real> &gradient) {
+  // Save s_k = x_{k+1} - x_{k}, and y_k = \nabla f_{k+1} - \nabla f_k.
+  Vector<Real> s(new_x_);
+  s.AddVec(-1.0, x_); // s = new_x_ - x_.
+  Vector<Real> y(gradient);
+  y.AddVec(-1.0, deriv_); // y = gradient - deriv_.
+  
+  // Warning: there is a division in the next line.  This could
+  // generate inf or nan, but this wouldn't necessarily be an error
+  // at this point because for zero step size or derivative we should
+  // terminate the iterations.  But this is up to the calling code.
+  Real prod = VecVec(y, s);
+  Real len = s.Norm(2.0);
+
+  if ((opts_.minimize && prod <= 1.0e-20) || (!opts_.minimize && prod >= -1.0e-20)
+      || len == 0.0)
+    return false; // This will force restart.
+  
+  KALDI_VLOG(3) << "Accepted step; length was " << len
+                << ", prod was " << prod;
+  
+  // store x_{k+1} and the function value f_{k+1}.
+  x_.CopyFromVec(new_x_);
+  f_ = function_value;
+  k_++;
+
+  return true; // We successfully accepted the step.
+}
+
+template<typename Real>
+void OptimizeLsfl<Real>::Restart(const VectorBase<Real> &x,
+                                 Real f,
+                                 const VectorBase<Real> &gradient) {
+  k_ = 0; // Restart the iterations!  [But note that the Hessian,
+  // whatever it was, stays as before.]
+  if (&x_ != &x)
+    x_.CopyFromVec(x);
+  new_x_.CopyFromVec(x);
+  f_ = f;
+  computation_state_ = kBeforeStep;
+  ComputeNewDirection(f, gradient);
+}
+
+template<typename Real>
+void OptimizeLsfl<Real>::StepSizeIteration(Real function_value,
+                                           const VectorBase<Real> &gradient) {
+  KALDI_VLOG(3) << "In step size iteration, function value changed "
+                << f_ << " to " << function_value;
+  
+  // We're in some part of the backtracking, and the user is providing
+  // the objective function value and gradient.
+  // We're checking two conditions: Wolfe i) [the Armijo rule] and
+  // Wolfe ii).
+  
+  // The Armijo rule (when minimizing) is:
+  // f(k_k + \alpha_k p_k) <= f(x_k) + c_1 \alpha_k p_k^T \nabla f(x_k), where
+  //  \nabla means the derivative.
+  // Below, "temp" is the RHS of this equation, where (\alpha_k p_k) equals
+  // (new_x_ - x_); we don't store \alpha or p_k separately, they are implicit
+  // as the difference new_x_ - x_.
+
+  // Below, pf is \alpha_k p_k^T \nabla f(x_k).
+  Real pf = VecVec(new_x_, deriv_) - VecVec(x_, deriv_);
+  Real temp = f_ + opts_.c1 * pf;
+  
+  bool wolfe_i_ok;
+  if (opts_.minimize) wolfe_i_ok = (function_value <= temp);
+  else wolfe_i_ok = (function_value >= temp);
+  
+  // Wolfe condition ii) can be written as:
+  //  p_k^T \nabla f(x_k + \alpha_k p_k) >= c_2 p_k^T \nabla f(x_k)
+  // p2f equals \alpha_k p_k^T \nabla f(x_k + \alpha_k p_k), where
+  // (\alpha_k p_k^T) is (new_x_ - x_).
+  // Note that in our version of Wolfe condition (ii) we have an extra
+  // factor alpha, which doesn't affect anything.
+  Real p2f = VecVec(new_x_, gradient) - VecVec(x_, gradient);
+  //eps = (sizeof(Real) == 4 ? 1.0e-05 : 1.0e-10) *
+  //(std::abs(p2f) + std::abs(pf));
+  bool wolfe_ii_ok;
+  if (opts_.minimize) wolfe_ii_ok = (p2f >= opts_.c2 * pf);
+  else wolfe_ii_ok = (p2f <= opts_.c2 * pf);
+
+  enum { kDecrease, kNoChange } d_action; // What do do with d_: leave it alone,
+  // or take the square root.
+  enum { kAccept, kDecreaseStep, kIncreaseStep, kRestart } iteration_action;
+  // What we'll do in the overall iteration: accept this value, DecreaseStep
+  // (reduce the step size), IncreaseStep (increase the step size), or kRestart
+  // (set k back to zero).  Generally when we can't get both conditions to be
+  // true with a reasonable period of time, it makes sense to restart, because
+  // probably we've almost converged and got into numerical issues; from here
+  // we'll just produced NaN's.  Restarting is a safe thing to do and the outer
+  // code will quickly detect convergence.
+
+  d_action = kNoChange; // the default.
+  
+  if (wolfe_i_ok && wolfe_ii_ok) {
+    iteration_action = kAccept;
+    d_action = kNoChange; // actually doesn't matter, it'll get reset.
+  } else if (!wolfe_i_ok) {
+    // If wolfe i) [the Armijo rule] failed then we went too far (or are
+    // meeting numerical problems).
+    if (last_failure_type_ == kWolfeII) { // Last time we failed it was Wolfe ii).
+      // When we switch between them we decrease d.
+      d_action = kDecrease;
+    }
+    iteration_action = kDecreaseStep;
+    last_failure_type_ = kWolfeI;
+    num_wolfe_i_failures_++;
+  } else if (!wolfe_ii_ok) {
+    // Curvature condition failed -> we did not go far enough.
+    if (last_failure_type_ == kWolfeI) // switching between wolfe i and ii failures->
+      d_action = kDecrease; // decrease value of d.
+    iteration_action = kIncreaseStep;
+    last_failure_type_ = kWolfeII;
+    num_wolfe_ii_failures_++;
+  }
+
+  // Test whether we've been switching too many times betwen wolfe i) and ii)
+  // failures, or overall have an excessive number of failures.  We just give up
+  // and restart L-BFGS.  Probably we've almost converged.
+  if (num_wolfe_i_failures_ + num_wolfe_ii_failures_ >
+      opts_.max_line_search_iters) {
+    KALDI_VLOG(2) << "Too many steps in line search -> restarting.";
+    iteration_action = kRestart;
+  }
+
+  if (d_action == kDecrease)
+    d_ = std::sqrt(d_);
+  
+  KALDI_VLOG(3) << "d = " << d_ << ", iter = " << k_ << ", action = "
+                << (iteration_action == kAccept ? "accept" :
+                    (iteration_action == kDecreaseStep ? "decrease" :
+                     (iteration_action == kIncreaseStep ? "increase" :
+                      "reject")));
+  
+  // Note: even if iteration_action != Restart at this point,
+  // some code below may set it to Restart.
+  if (iteration_action == kAccept) {
+    if (AcceptStep(function_value, gradient)) { // If we did
+      // not detect a problem while accepting the step..
+      computation_state_ = kBeforeStep;
+      ComputeNewDirection(function_value, gradient);
+    } else {
+      KALDI_VLOG(2) << "Restarting L-BFGS computation; problem found while "
+                    << "accepting step.";
+      iteration_action = kRestart; // We'll have to restart now.
+    }
+  }
+  if (iteration_action == kDecreaseStep || iteration_action == kIncreaseStep) {
+    Real scale = (iteration_action == kDecreaseStep ? 1.0 / d_ : d_);
+    temp_.CopyFromVec(new_x_);
+    new_x_.Scale(scale);
+    new_x_.AddVec(1.0 - scale, x_);
+    if (new_x_.ApproxEqual(temp_, 0.0)) {
+      // Value of new_x_ did not change at all --> we must restart.
+      KALDI_VLOG(3) << "Value of x did not change, when taking step; "
+                    << "will restart computation.";
+      iteration_action = kRestart;
+    }
+    if (new_x_.ApproxEqual(temp_, 1.0e-08) &&
+        std::abs(f_ - function_value) < 1.0e-08 *
+        std::abs(f_) && iteration_action == kDecreaseStep) {
+      // This is common and due to roundoff.
+      KALDI_VLOG(3) << "We appear to be backtracking while we are extremely "
+                    << "close to the old value; restarting.";
+      iteration_action = kRestart;
+    }
+        
+    if (iteration_action == kDecreaseStep) {
+      num_wolfe_i_failures_++;
+      last_failure_type_ = kWolfeI;
+    } else {
+      num_wolfe_ii_failures_++;
+      last_failure_type_ = kWolfeII;
+    }
+  }
+  if (iteration_action == kRestart) {
+    // We want to restart the computation.  If the objf at new_x_ is
+    // better than it was at x_, we'll start at new_x_, else at x_.
+    bool use_newx;
+    if (opts_.minimize) use_newx = (function_value < f_);
+    else use_newx = (function_value > f_);
+    KALDI_VLOG(3) << "Restarting computation.";
+    if (use_newx) Restart(new_x_, function_value, gradient);
+    else Restart(x_, f_, deriv_);
+  }
+}
+
+template<typename Real>
+void OptimizeLsfl<Real>::DoStep(Real function_value,
+                                const VectorBase<Real> &gradient) {
+  if (opts_.minimize ? function_value < best_f_ : function_value > best_f_) {
+    best_f_ = function_value;
+    best_x_.CopyFromVec(new_x_);
+  }
+  if (computation_state_ == kBeforeStep)
+    ComputeNewDirection(function_value, gradient);
+  else // kWithinStep{1,2,3}
+    StepSizeIteration(function_value, gradient);
+}
+
+template<typename Real>
+const VectorBase<Real>&
+OptimizeLsfl<Real>::GetValue(Real *objf_value) const {
+  if (objf_value != NULL) *objf_value = best_f_;
+  return best_x_;
+}
+
+// LSFL
+
 
 // Below, N&W refers to Nocedal and Wright, "Numerical Optimization", 2nd Ed.
 
@@ -558,6 +897,11 @@ int32 LinearCgd(const LinearCgdOptions &opts,
 } 
     
 // Instantiate the class for float and double.
+template
+class OptimizeLsfl<float>;
+template
+class OptimizeLsfl<double>;
+
 template
 class OptimizeLbfgs<float>;
 template
