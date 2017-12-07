@@ -104,8 +104,8 @@ struct LsflOptions {
       c2(0.9),
       d(2.0),
       max_line_search_iters(50),
-      avg_step_length(4)
-      phi(0.1)
+      avg_step_length(4),
+      phi(0.1),
       theta(0.1) { }
 };
 
