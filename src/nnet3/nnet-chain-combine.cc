@@ -158,8 +158,6 @@ void NnetChainCombiner::Combine() {
   int32 dim = ParameterDim();
   LsflOptions lsfl_options;
   lsfl_options.minimize = false; // We're maximizing.
-  lsfl_options.m = dim; // Store the same number of vectors as the dimension
-                        // itself, so this is BFGS.
   lsfl_options.first_step_impr = combine_config_.initial_impr;
 
   Vector<double> params(dim), deriv(dim);
