@@ -93,7 +93,7 @@ void OptimizeLsfl<Real>::EstimateInverseHessian(const VectorBase<Real> &gradient
 
     // Hg = np.dot(H, g) # grad-shape
     Vector<Real> Hg(dim);
-    Hg.AddMatVec(1.0, _H, kNoTrans, g, 0.0);
+    Hg.AddMatVec(1.0, H_, kNoTrans, g, 0.0);
 
     // Real gHg = np.inner(g, Hg) # scalar
     Real gHg = VecVec(g, Hg);
