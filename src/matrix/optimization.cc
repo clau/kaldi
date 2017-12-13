@@ -52,7 +52,7 @@ void OptimizeGd<Real>::DoStep(Real function_value,
     best_x_.CopyFromVec(new_x_);
   }
 
-  if (k > 0) {
+  if (k_ > 0) {
     prev_step_.CopyFromVec(new_x_);
     prev_step_.AddVec(-1.0, x_);
     x_.CopyFromVec(new_x_);
