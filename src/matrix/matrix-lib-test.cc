@@ -3127,7 +3127,7 @@ template<typename Real> static void UnitTestLsfl() {
   AssertEqual(Hg(2), 42);
 }
 
-template<typename Real> static voic UnitTestGd() {
+template<typename Real> static void UnitTestGd() {
   MatrixIndexT temp = g_kaldi_verbose_level;
   g_kaldi_verbose_level = 4;
   for (MatrixIndexT iter = 0; iter < 3; iter++) {
@@ -3176,7 +3176,7 @@ template<typename Real> static voic UnitTestGd() {
     Vector<Real> diff(x);
     diff.AddVec(-1.0, x_opt);
     KALDI_VLOG(2) << "Gradient Descent finished after " << num_iters << " function evaluations.";
-    
+
     if (sizeof(Real) == 8) {
       KALDI_ASSERT(diff.Norm(2.0) < 0.5);
     } else {
