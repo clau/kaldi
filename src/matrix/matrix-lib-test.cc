@@ -3127,6 +3127,65 @@ template<typename Real> static void UnitTestLsfl() {
   AssertEqual(Hg(2), 42);
 }
 
+template<typename Real> static voic UnitTestGd() {
+  MatrixIndexT temp = g_kaldi_verbose_level;
+  g_kaldi_verbose_level = 4;
+  for (MatrixIndexT iter = 0; iter < 3; iter++) {
+    bool minimize = (iter % 2 == 0);
+    MatrixIndexT dim = 1 + Rand() % 30;
+    SpMatrix<Real> S(dim);
+    RandPosdefSpMatrix(dim, &S);
+    Vector<Real> v(dim);
+    v.SetRandn();
+    // Function will be f = exp(0.1 * [ x' v  -0.5 x' S x ])
+    // This is to maximize; we negate it when minimizing.
+
+    //Vector<Real> hessian(dim);
+    //hessian.CopyDiagFromSp(S);
+
+    SpMatrix<Real> Sinv(S);
+    Sinv.Invert();
+    Vector<Real> x_opt(dim);
+    x_opt.AddSpVec(1.0, Sinv, v, 0.0); // S^{-1} v-- the optimum.
+
+    Vector<Real> init_x(dim);
+    init_x.SetRandn();
+
+    GdOptions opts;
+    opts.minimize = minimize; // This objf has a maximum, not a minimum.
+    OptimizeGd<Real> opt_gd(init_x, opts);
+    MatrixIndexT num_iters = 0;
+    Real c = 0.01;
+    Real sign = (minimize ? -1.0 : 1.0); // function has a maximum not minimum..
+    while (opt_gd.RecentStepLength() > 1.0e-04) {
+      KALDI_VLOG(2) << "Last step length is " << opt_gd.RecentStepLength();
+      const VectorBase<Real> &x = opt_gd.GetProposedValue();
+      Real logf = VecVec(x, v) - 0.5 * VecSpVec(x, S, x);
+      Vector<Real> dlogf_dx(v); //  derivative of log(f) w.r.t. x.
+      dlogf_dx.AddSpVec(-1.0, S, x, 1.0);
+      KALDI_VLOG(2) << "Gradient magnitude is " << dlogf_dx.Norm(2.0);
+      Real f = Exp(c * logf);
+      Vector<Real> df_dx(dlogf_dx);
+      df_dx.Scale(f * c); // comes from derivative of the exponential function.
+      f *= sign;
+      df_dx.Scale(sign);
+      opt_gd.DoStep(f, df_dx);
+      num_iters++;
+    }
+    Vector<Real> x (opt_gd.GetValue());
+    Vector<Real> diff(x);
+    diff.AddVec(-1.0, x_opt);
+    KALDI_VLOG(2) << "Gradient Descent finished after " << num_iters << " function evaluations.";
+    
+    if (sizeof(Real) == 8) {
+      KALDI_ASSERT(diff.Norm(2.0) < 0.5);
+    } else {
+      KALDI_ASSERT(diff.Norm(2.0) < 2.0);
+    }
+  }
+  g_kaldi_verbose_level = temp;
+}
+
 template<typename Real> static void UnitTestLbfgs() {
   MatrixIndexT temp = g_kaldi_verbose_level;
   g_kaldi_verbose_level = 4;
@@ -4575,6 +4634,7 @@ template<typename Real> static void MatrixUnitTest(bool full_test) {
   UnitTestFloorUnit<Real>();
   UnitTestAddMat2Sp<Real>();
   UnitTestLsfl<Real>();
+  UnitTestGd<Real>();
   UnitTestLbfgs<Real>();
   // UnitTestSvdBad<Real>(); // test bug in Jama SVD code.
   UnitTestCompressedMatrix<Real>();

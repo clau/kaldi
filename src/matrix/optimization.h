@@ -65,12 +65,80 @@ int32 LinearCgd(const LinearCgdOptions &opts,
                 VectorBase<Real> *x);
 
 
-
 /**
-  Lsfl
+  GD
 */
 
-struct LsflOptions {
+struct GdOptions {
+  bool minimize; // if true, we're minimizing, else maximizing.
+  
+  float step_rate;
+  float momentum;
+  
+  GdOptions (bool minimize = true):
+      minimize(minimize),
+      step_rate(0.1),
+      momentum(0.0) { }
+};
+
+
+template<typename Real>
+class OptimizeGd {
+ public:
+  /// Initializer takes the starting value of x.
+  OptimizeGd(const VectorBase<Real> &x,
+             const GdOptions &opts);
+  
+  /// This returns the value of the variable x that has the best objective
+  /// function so far, and the corresponding objective function value if
+  /// requested.  This would typically be called only at the end.
+  const VectorBase<Real>& GetValue(Real *objf_value = NULL) const;
+  
+  /// This returns the value at which the function wants us
+  /// to compute the objective function and gradient.
+  const VectorBase<Real>& GetProposedValue() const { return new_x_; }
+  
+  /// Returns the average magnitude of the last n steps (but not
+  /// more than the number we have stored).  Before we have taken
+  /// any steps, returns +infinity.  Note: if the most recent
+  /// step length was 0, it returns 0, regardless of the other
+  /// step lengths.  This makes it suitable as a convergence test
+  /// (else we'd generate NaN's).
+  Real RecentStepLength() const;
+  
+  /// The user calls this function to provide the class with the
+  /// function and gradient info at the point GetProposedValue().
+  /// If this point is outside the constraints you can set function_value
+  /// to {+infinity,-infinity} for {minimization,maximization} problems.
+  /// In this case the gradient, and also the second derivative (if you call
+  /// the second overloaded version of this function) will be ignored.
+  void DoStep(Real function_value,
+              const VectorBase<Real> &gradient);
+    
+ private:
+  KALDI_DISALLOW_COPY_AND_ASSIGN(OptimizeGd);
+  
+  inline MatrixIndexT Dim() { return x_.Dim(); }
+
+  GdOptions opts_;
+  SignedMatrixIndexT k_; // Iteration number, starts from zero.  Gets set back to zero
+  // when we restart.
+
+  Vector<Real> prev_step_; // Previous step.
+  Vector<Real> x_;      // current x.
+  Vector<Real> new_x_;  // the x proposed in the line search.
+  Vector<Real> best_x_; // the x with the best objective function so far
+                        // (either the same as x_ or something in the current line search.)
+
+  Real best_f_; // the best objective function so far.
+
+};
+
+/**
+  Ssvm
+*/
+
+struct SsvmOptions {
   bool minimize; // if true, we're minimizing, else maximizing.
   float first_step_learning_rate; // The very first step of L-BFGS is
   // like gradient descent.  If you want to configure the size of that step,
@@ -95,7 +163,7 @@ struct LsflOptions {
   float phi;
   float theta;
   
-  LsflOptions (bool minimize = true):
+  SsvmOptions (bool minimize = true):
       minimize(minimize),
       first_step_learning_rate(1.0),
       first_step_length(0.0),
@@ -110,11 +178,11 @@ struct LsflOptions {
 };
 
 template<typename Real>
-class OptimizeLsfl {
+class OptimizeSsvm {
  public:
   /// Initializer takes the starting value of x.
-  OptimizeLsfl(const VectorBase<Real> &x,
-               const LsflOptions &opts);
+  OptimizeSsvm(const VectorBase<Real> &x,
+               const SsvmOptions &opts);
   
   /// This returns the value of the variable x that has the best objective
   /// function so far, and the corresponding objective function value if
@@ -135,7 +203,7 @@ class OptimizeLsfl {
               const VectorBase<Real> &gradient);
     
  private:
-  KALDI_DISALLOW_COPY_AND_ASSIGN(OptimizeLsfl);
+  KALDI_DISALLOW_COPY_AND_ASSIGN(OptimizeSsvm);
 
 
   // The following variable says what stage of the computation we're at.
@@ -167,7 +235,7 @@ class OptimizeLsfl {
                          const VectorBase<Real> &gradient);
   
   
-  LsflOptions opts_;
+  SsvmOptions opts_;
   SignedMatrixIndexT k_; // Iteration number, starts from zero.  Gets set back to zero
   // when we restart.
   

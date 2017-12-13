@@ -28,11 +28,67 @@
 
 namespace kaldi {
 
-// LSFL
+// Gd
 
 template<typename Real>
-OptimizeLsfl<Real>::OptimizeLsfl(const VectorBase<Real> &x,
-                                 const LsflOptions &opts):
+OptimizeGd<Real>::OptimizeGd(const VectorBase<Real> &x,
+                             const GdOptions &opts):
+    opts_(opts), k_(0) {
+  MatrixIndexT dim = x.Dim();
+  KALDI_ASSERT(dim > 0);
+  x_ = x;      // this is the value of x_k
+  new_x_ = x;  // this is where we'll evaluate the function next.
+  prev_step_.Resize(dim);
+  // Just set best_f_ to some invalid value, as we haven't yet set it.
+  best_f_ = (opts.minimize ? 1 : -1 ) * std::numeric_limits<Real>::infinity();
+  best_x_ = x_;
+}
+
+template<typename Real>
+void OptimizeGd<Real>::DoStep(Real function_value,
+                              const VectorBase<Real> &gradient) {
+  if (opts_.minimize ? function_value < best_f_ : function_value > best_f_) {
+    best_f_ = function_value;
+    best_x_.CopyFromVec(new_x_);
+  }
+
+  if (k > 0) {
+    prev_step_.CopyFromVec(new_x_);
+    prev_step_.AddVec(-1.0, x_);
+    x_.CopyFromVec(new_x_);
+  }
+
+  // new_x_ = x_ - step_rate * gradient - momentum * prev_step_
+  new_x_.CopyFromVec(x_);
+  new_x_.AddVec(-opts_.step_rate, gradient);
+  new_x_.AddVec(-opts_.momentum, prev_step_);
+  
+  k_++;
+}
+
+template<typename Real>
+Real OptimizeGd<Real>::RecentStepLength() const {
+  if (k_ < 2) return std::numeric_limits<Real>::infinity();
+  else {
+    return prev_step_.Norm(2.0);
+  }
+}
+
+template<typename Real>
+const VectorBase<Real>&
+OptimizeGd<Real>::GetValue(Real *objf_value) const {
+  if (objf_value != NULL) *objf_value = best_f_;
+  return best_x_;
+}
+
+// Gd
+
+
+// Ssvm
+
+template<typename Real>
+OptimizeSsvm<Real>::OptimizeSsvm(const VectorBase<Real> &x,
+                                 const SsvmOptions &opts):
     opts_(opts), k_(0), computation_state_(kBeforeStep) {
   MatrixIndexT dim = x.Dim();
   KALDI_ASSERT(dim > 0);
@@ -48,7 +104,7 @@ OptimizeLsfl<Real>::OptimizeLsfl(const VectorBase<Real> &x,
 }
 
 template<typename Real>
-void OptimizeLsfl<Real>::EstimateInverseHessian(const VectorBase<Real> &gradient) {
+void OptimizeSsvm<Real>::EstimateInverseHessian(const VectorBase<Real> &gradient) {
   if (k_ == 0) {
     // H was never set up.  Set it up for the first time.
     Real learning_rate;
@@ -128,7 +184,7 @@ void OptimizeLsfl<Real>::EstimateInverseHessian(const VectorBase<Real> &gradient
 }  
 
 template<typename Real>
-void OptimizeLsfl<Real>::ComputeNewDirection(Real function_value,
+void OptimizeSsvm<Real>::ComputeNewDirection(Real function_value,
                                              const VectorBase<Real> &gradient) {
   KALDI_ASSERT(computation_state_ == kBeforeStep);
   EstimateInverseHessian(gradient);
@@ -156,7 +212,7 @@ void OptimizeLsfl<Real>::ComputeNewDirection(Real function_value,
 
 
 template<typename Real>
-bool OptimizeLsfl<Real>::AcceptStep(Real function_value,
+bool OptimizeSsvm<Real>::AcceptStep(Real function_value,
                                     const VectorBase<Real> &gradient) {
   // Save s_k = x_{k+1} - x_{k}, and y_k = \nabla f_{k+1} - \nabla f_k.
   Vector<Real> s(new_x_);
@@ -187,7 +243,7 @@ bool OptimizeLsfl<Real>::AcceptStep(Real function_value,
 }
 
 template<typename Real>
-void OptimizeLsfl<Real>::Restart(const VectorBase<Real> &x,
+void OptimizeSsvm<Real>::Restart(const VectorBase<Real> &x,
                                  Real f,
                                  const VectorBase<Real> &gradient) {
   k_ = 0; // Restart the iterations!  [But note that the Hessian,
@@ -201,7 +257,7 @@ void OptimizeLsfl<Real>::Restart(const VectorBase<Real> &x,
 }
 
 template<typename Real>
-void OptimizeLsfl<Real>::StepSizeIteration(Real function_value,
+void OptimizeSsvm<Real>::StepSizeIteration(Real function_value,
                                            const VectorBase<Real> &gradient) {
   KALDI_VLOG(3) << "In step size iteration, function value changed "
                 << f_ << " to " << function_value;
@@ -346,7 +402,7 @@ void OptimizeLsfl<Real>::StepSizeIteration(Real function_value,
 }
 
 template<typename Real>
-void OptimizeLsfl<Real>::DoStep(Real function_value,
+void OptimizeSsvm<Real>::DoStep(Real function_value,
                                 const VectorBase<Real> &gradient) {
   if (opts_.minimize ? function_value < best_f_ : function_value > best_f_) {
     best_f_ = function_value;
@@ -360,12 +416,12 @@ void OptimizeLsfl<Real>::DoStep(Real function_value,
 
 template<typename Real>
 const VectorBase<Real>&
-OptimizeLsfl<Real>::GetValue(Real *objf_value) const {
+OptimizeSsvm<Real>::GetValue(Real *objf_value) const {
   if (objf_value != NULL) *objf_value = best_f_;
   return best_x_;
 }
 
-// LSFL
+// Ssvm
 
 
 // Below, N&W refers to Nocedal and Wright, "Numerical Optimization", 2nd Ed.
@@ -898,9 +954,14 @@ int32 LinearCgd(const LinearCgdOptions &opts,
     
 // Instantiate the class for float and double.
 template
-class OptimizeLsfl<float>;
+class OptimizeGd<float>;
 template
-class OptimizeLsfl<double>;
+class OptimizeGd<double>;
+
+template
+class OptimizeSsvm<float>;
+template
+class OptimizeSsvm<double>;
 
 template
 class OptimizeLbfgs<float>;
