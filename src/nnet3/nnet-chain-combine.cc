@@ -173,7 +173,7 @@ void NnetChainCombiner::Combine() {
   // must recompute nnet_ if "params" is not exactly equal to the
   // final params that LB
   Vector<double> final_params(dim);
-  final_params.CopyFromVec(lsfl.GetValue(&objf));
+  final_params.CopyFromVec(lbfgs.GetValue(&objf));
   if (!params.ApproxEqual(final_params, 0.0)) {
     // the following call makes sure that nnet_ corresponds to the parameters
     // in "params".
