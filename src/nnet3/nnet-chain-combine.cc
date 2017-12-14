@@ -132,47 +132,27 @@ void NnetChainCombiner::Combine() {
     SelfTestModelDerivatives();
   }
 
-  // int32 dim = ParameterDim();
-  // LbfgsOptions lbfgs_options;
-  // lbfgs_options.minimize = false; // We're maximizing.
-  // lbfgs_options.m = dim; // Store the same number of vectors as the dimension
-  //                        // itself, so this is BFGS.
-  // lbfgs_options.first_step_impr = combine_config_.initial_impr;
-
-  // Vector<double> params(dim), deriv(dim);
-  // double objf, initial_objf;
-  // GetInitialParameters(&params);
-
-
-  // OptimizeLbfgs<double> lbfgs(params, lbfgs_options);
-
-  // for (int32 i = 0; i < combine_config_.num_iters; i++) {
-  //   params.CopyFromVec(lbfgs.GetProposedValue());
-  //   objf = ComputeObjfAndDerivFromParameters(params, &deriv);
-  //   KALDI_VLOG(2) << "Iteration " << i << " params = " << params
-  //                 << ", objf = " << objf << ", deriv = " << deriv;
-  //   if (i == 0) initial_objf = objf;
-  //   lbfgs.DoStep(objf, deriv);
-  // }
-
   int32 dim = ParameterDim();
-  LsflOptions lsfl_options;
-  lsfl_options.minimize = false; // We're maximizing.
-  lsfl_options.first_step_impr = combine_config_.initial_impr;
+  LbfgsOptions lbfgs_options;
+  lbfgs_options.minimize = false; // We're maximizing.
+  lbfgs_options.m = dim; // Store the same number of vectors as the dimension
+                         // itself, so this is BFGS.
+  lbfgs_options.first_step_impr = combine_config_.initial_impr;
 
   Vector<double> params(dim), deriv(dim);
   double objf, initial_objf;
   GetInitialParameters(&params);
 
-  OptimizeLsfl<double> lsfl(params, lsfl_options);
+
+  OptimizeLbfgs<double> lbfgs(params, lbfgs_options);
 
   for (int32 i = 0; i < combine_config_.num_iters; i++) {
-    params.CopyFromVec(lsfl.GetProposedValue());
+    params.CopyFromVec(lbfgs.GetProposedValue());
     objf = ComputeObjfAndDerivFromParameters(params, &deriv);
     KALDI_VLOG(2) << "Iteration " << i << " params = " << params
                   << ", objf = " << objf << ", deriv = " << deriv;
     if (i == 0) initial_objf = objf;
-    lsfl.DoStep(objf, deriv);
+    lbfgs.DoStep(objf, deriv);
   }
 
   if (!combine_config_.sum_to_one_penalty) {
