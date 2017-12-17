@@ -125,7 +125,7 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
   x_.CopyFromVec(new_x_);
 
   // Fisher Memory
-  F(fi_++ % opts_.fisher_memory).CopyFromVec(gradient);
+  F(fi_++).CopyFromVec(gradient);
 
   // x_s_ += x_
   x_s_.AddVec(1.0, x_);

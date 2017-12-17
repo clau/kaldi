@@ -179,7 +179,7 @@ class OptimizeAdaQn {
   inline MatrixIndexT Dim() { return x_.Dim(); }
 
   SubVector<Real> F(MatrixIndexT i) {
-    return SubVector<Real>(fisher_data_, i); // vector y_i
+    return SubVector<Real>(fisher_data_, i % opts_.fisher_memory); // vector y_i
   }
 
   void RecordStepLength(Real s);
