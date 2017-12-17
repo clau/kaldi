@@ -158,18 +158,18 @@ class OptimizeAdaQn {
 
   bool ShouldResetFisherMemory() {
     return t_ > 1 && k_ % opts_.fisher_memory == 0;
-  }
+  };
 
   const VectorBase<Real>& GetLastCheckpointedValue() {
     return x_o_;
-  }
+  };
 
   const VectorBase<Real>& GetAverageValueSinceCheckpoint() {
     x_n_.CopyFromVec(x_s_);
     x_n_.AddVec(1.0, new_x_);
     x_n_.Scale(1.0 / opts_.L);
     return x_n_;
-  }
+  };
     
  private:
   KALDI_DISALLOW_COPY_AND_ASSIGN(OptimizeAdaQn);
@@ -184,14 +184,14 @@ class OptimizeAdaQn {
 
   AdaQnOptions opts_;
 
-  QuasiNewton<Real> qn_;
-
   SignedMatrixIndexT k_; // Iteration number, starts from zero.  Gets set back to zero
   // when we restart.
   SignedMatrixIndexT t_;
+  SignedMatrixIndexT fi_;
 
   Matrix<Real> fisher_data_;
-  SignedMatrixIndexT fi_;
+  
+  QuasiNewton<Real> qn_;
 
   Vector<Real> x_s_;
   Vector<Real> x_o_;
