@@ -3129,9 +3129,9 @@ template<typename Real> static void UnitTestLsfl() {
 
 template<typename Real> static Real GetFunctionValue(Real sign,
                                                      Real c,
-                                                     Vector<Real> x,
-                                                     Vector<Real> v,
-                                                     SpMatrix<Real> S) {
+                                                     const Vector<Real> &x,
+                                                     const Vector<Real> &v,
+                                                     const SpMatrix<Real> &S) {
   Real logf = VecVec(x, v) - 0.5 * VecSpVec(x, S, x);
   Real f = Exp(c * logf);
   f *= sign;
@@ -3172,11 +3172,8 @@ template<typename Real> static void UnitTestAdaQn() {
       dlogf_dx.AddSpVec(-1.0, S, x, 1.0);
       KALDI_VLOG(2) << "Gradient magnitude is " << dlogf_dx.Norm(2.0);
       Vector<Real> df_dx(dlogf_dx);
-      df_dx.Scale(f * c); // comes from derivative of the exponential function.
-      df_dx.Scale(sign);
-
-
       Real f = GetFunctionValue(sign, c, x, v, S);
+      df_dx.Scale(f * c); // comes from derivative of the exponential function.
 
       bool reset_fisher_memory = false;
       if (opt_adaqn.ShouldResetFisherMemory()) {
