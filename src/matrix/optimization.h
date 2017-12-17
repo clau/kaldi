@@ -64,48 +64,6 @@ int32 LinearCgd(const LinearCgdOptions &opts,
                 const SpMatrix<Real> &A, const VectorBase<Real> &b,
                 VectorBase<Real> *x);
 
-
-/**
-  LBFGS Helper Class
-*/
-
-template<typename Real>
-class QuasiNewton {
-  public:
-    QuasiNewton(): k_(0) {}
-
-    void set(int memory, MatrixIndexT dim);
-
-    void reset();
-
-    void store(const VectorBase<Real> &s, const VectorBase<Real> &y);
-
-    const VectorBase<Real>& two_loop(const VectorBase<Real> &gradient);
-
-  private:
-    KALDI_DISALLOW_COPY_AND_ASSIGN(QuasiNewton);
-  
-    int memory_;
-
-    MatrixIndexT dim_;
-    MatrixIndexT k_;
-
-    Matrix<Real> data_; // dimension (m*2) x dim.  Even rows store
-    Vector<Real> direction_;
-
-    Vector<Real> alpha_;
-    Vector<Real> rho_;
-    Vector<Real> q_;
-
-    SubVector<Real> Y(MatrixIndexT i) {
-      return SubVector<Real>(data_, (i % dim_) * 2); // vector y_i
-    };
-
-    SubVector<Real> S(MatrixIndexT i) {
-      return SubVector<Real>(data_, (i % dim_) * 2 + 1); // vector s_i
-    };
-};
-
 /**
   AdaQn
 */
@@ -189,6 +147,12 @@ class OptimizeAdaQn {
 
   void RecordStepLength(Real s);
 
+  void ResetLbfgs();
+
+  void UpdateLbfgs(const VectorBase<Real> &s, const VectorBase<Real> &y);
+
+  void RunLbfgs(const VectorBase<Real> &gradient);
+
   AdaQnOptions opts_;
 
   SignedMatrixIndexT k_; // Iteration number, starts from zero.  Gets set back to zero
@@ -197,8 +161,6 @@ class OptimizeAdaQn {
   SignedMatrixIndexT fi_;
 
   Matrix<Real> fisher_data_;
-  
-  QuasiNewton<Real> qn_;
 
   Vector<Real> x_s_;
   Vector<Real> x_o_;
@@ -216,6 +178,25 @@ class OptimizeAdaQn {
   // (up to m) iterations; these are not stored in a rotating buffer but
   // are shifted by one each time (this is more convenient when we
   // restart, as we keep this info past restarting).
+
+  // LBFGS Variables
+  
+  MatrixIndexT lbfgs_i_;
+
+  Matrix<Real> lbfgs_data_; // dimension (m*2) x dim.  Even rows store
+  Vector<Real> lbfgs_direction_;
+
+  Vector<Real> alpha_;
+  Vector<Real> rho_;
+  Vector<Real> q_;
+
+  SubVector<Real> Y(MatrixIndexT i) {
+    return SubVector<Real>(lbfgs_data_, (i % dim_) * 2); // vector y_i
+  };
+
+  SubVector<Real> S(MatrixIndexT i) {
+    return SubVector<Real>(lbfgs_data_, (i % dim_) * 2 + 1); // vector s_i
+  };
 
 };
 

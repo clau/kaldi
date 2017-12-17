@@ -28,77 +28,12 @@
 
 namespace kaldi {
 
-// QuasiNewton
-
-template<typename Real>
-void QuasiNewton<Real>::set(int memory, MatrixIndexT dim) {
-  memory_ = memory;
-  dim_ = dim;
-  data_.Resize(2 * memory, dim);
-  direction_.Resize(dim);
-  alpha_.Resize(dim);
-  rho_.Resize(dim);
-  q_.Resize(dim);
-}
-
-template<typename Real>
-void QuasiNewton<Real>::reset()  {
-  data_.SetZero();
-  direction_.SetZero();
-  k_ = 0;
-}
-
-template<typename Real>
-void QuasiNewton<Real>::store(const VectorBase<Real> &s, const VectorBase<Real> &y)  {
-  S(k_).CopyFromVec(s);
-  Y(k_).CopyFromVec(y);
-  k_++;
-}
-
-template<typename Real>
-const VectorBase<Real>& 
-QuasiNewton<Real>::two_loop(const VectorBase<Real> &gradient)  {
-
-  SignedMatrixIndexT m = memory_, k = k_;
-  // The rest of this is computing p_k <-- - H_k \nabla f_k using Algorithm
-  // 7.4 of N&W.
-
-  q_.CopyFromVec(gradient);
-
-  // for i = k - 1, k - 2, ... k - m
-  for (SignedMatrixIndexT i = k - 1;
-       i >= std::max(k - m, static_cast<SignedMatrixIndexT>(0));
-       i--) { 
-    alpha_(i % m) = rho_(i % m) * VecVec(S(i), q_); // \alpha_i <-- \rho_i s_i^T q.
-    q_.AddVec(-alpha_(i % m), Y(i)); // q <-- q - \alpha_i y_i
-  }
-
-  if (k == 0) {
-    direction_.CopyFromVec(q_);
-  } else {
-    SubVector<Real> y_km1 = Y(k_-1);
-    double gamma_k = VecVec(S(k_-1), y_km1) / VecVec(y_km1, y_km1);
-    direction_.SetZero();
-    direction_.AddVec(gamma_k, q_);  // r <-- H_k^{(0)} q.
-  }
-
-  // for k = k - m, k - m + 1, ... , k - 1
-  for (SignedMatrixIndexT i = std::max(k - m, static_cast<SignedMatrixIndexT>(0));
-       i < k;
-       i++) {
-    Real beta = rho_(i % m) * VecVec(Y(i), direction_); // \beta <-- \rho_i y_i^T r
-    direction_.AddVec(alpha_(i % m) - beta, S(i)); // r <-- r + s_i (\alpha_i - \beta)
-  }
-
-  return direction_;
-}
-
 // AdaQN
 
 template<typename Real>
 OptimizeAdaQn<Real>::OptimizeAdaQn(const VectorBase<Real> &x,
                                    const AdaQnOptions &opts):
-    opts_(opts), k_(1), t_(-1), fi_(0) {
+    opts_(opts), k_(1), t_(-1), fi_(0), lbfgs_i_(0) {
   MatrixIndexT dim = x.Dim();
   KALDI_ASSERT(dim > 0);
   x_ = x;      // this is the value of x_k
@@ -107,13 +42,19 @@ OptimizeAdaQn<Real>::OptimizeAdaQn(const VectorBase<Real> &x,
   best_f_ = (opts.minimize ? 1 : -1 ) * std::numeric_limits<Real>::infinity();
   best_x_ = x_;
   // 
-  qn_.set(opts_.lbfgs_memory, dim);
-  // 
   x_s_.Resize(dim);
   x_o_.Resize(dim);
   x_n_.Resize(dim);
   // 
   fisher_data_.Resize(opts_.fisher_memory, dim);
+
+  // LBFGS
+
+  lbfgs_data_.Resize(2 * opts_.lbfgs_memory, dim);
+  lbfgs_direction_.Resize(dim);
+  alpha_.Resize(dim);
+  rho_.Resize(dim);
+  q_.Resize(dim);
 }
 
 template<typename Real>
@@ -133,7 +74,8 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
   // x_s_ += x_
   x_s_.AddVec(1.0, x_);
 
-  new_x_.AddVec(-opts_.alpha, qn_.two_loop(gradient));
+  RunLbfgs(gradient);
+  new_x_.AddVec(-opts_.alpha, lbfgs_direction_);
 
   if (k_ % opts_.L == 0) {
     t_++;
@@ -149,7 +91,7 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
       // LCW
       // f(x_n) > 1.01*f(x_o_)
       if (reset_fisher_memory) {
-        qn_.reset();
+        ResetLbfgs();
         new_x_.CopyFromVec(x_o_);
         // reset fisher memory
         fi_ = 0;
@@ -178,7 +120,7 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
 
         Real rho = VecVec(s, y) / VecVec(y, y);
         if (rho > 1e-4) {
-          qn_.store(s, y);
+          UpdateLbfgs(s, y);
           x_o_.CopyFromVec(x_n_);
         }
       }
@@ -226,6 +168,58 @@ OptimizeAdaQn<Real>::GetValue(Real *objf_value) const {
   return best_x_;
 }
 
+
+template<typename Real>
+void OptimizeAdaQn<Real>::ResetLbfgs()  {
+  lbfgs_data_.SetZero();
+  lbfgs_direction_.SetZero();
+  lbfgs_i_ = 0;
+}
+
+template<typename Real>
+void OptimizeAdaQn<Real>::UpdateLbfgs(const VectorBase<Real> &s, const VectorBase<Real> &y)  {
+  S(lbfgs_i_).CopyFromVec(s);
+  Y(lbfgs_i_).CopyFromVec(y);
+  lbfgs_i_++;
+}
+
+template<typename Real>
+const VectorBase<Real>& 
+OptimizeAdaQn<Real>::RunLbfgs(const VectorBase<Real> &gradient)  {
+
+  SignedMatrixIndexT m = opts_.lbfgs_memory, k = lbfgs_i_;
+  // The rest of this is computing p_k <-- - H_k \nabla f_k using Algorithm
+  // 7.4 of N&W.
+
+  q_.CopyFromVec(gradient);
+
+  // for i = k - 1, k - 2, ... k - m
+  for (SignedMatrixIndexT i = k - 1;
+       i >= std::max(k - m, static_cast<SignedMatrixIndexT>(0));
+       i--) { 
+    alpha_(i % m) = rho_(i % m) * VecVec(S(i), q_); // \alpha_i <-- \rho_i s_i^T q.
+    q_.AddVec(-alpha_(i % m), Y(i)); // q <-- q - \alpha_i y_i
+  }
+
+  if (k == 0) {
+    lbfgs_direction_.CopyFromVec(q_);
+  } else {
+    SubVector<Real> y_km1 = Y(k_-1);
+    double gamma_k = VecVec(S(k_-1), y_km1) / VecVec(y_km1, y_km1);
+    lbfgs_direction_.SetZero();
+    lbfgs_direction_.AddVec(gamma_k, q_);  // r <-- H_k^{(0)} q.
+  }
+
+  // for k = k - m, k - m + 1, ... , k - 1
+  for (SignedMatrixIndexT i = std::max(k - m, static_cast<SignedMatrixIndexT>(0));
+       i < k;
+       i++) {
+    Real beta = rho_(i % m) * VecVec(Y(i), lbfgs_direction_); // \beta <-- \rho_i y_i^T r
+    lbfgs_direction_.AddVec(alpha_(i % m) - beta, S(i)); // r <-- r + s_i (\alpha_i - \beta)
+  }
+
+  return lbfgs_direction_;
+}
 
 // AdaQN
 
