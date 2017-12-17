@@ -83,7 +83,8 @@ class QuasiNewton {
     const VectorBase<Real>& two_loop(const VectorBase<Real> &gradient);
 
   private:
-
+    KALDI_DISALLOW_COPY_AND_ASSIGN(QuasiNewton);
+  
     int memory_;
 
     MatrixIndexT dim_;
