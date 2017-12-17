@@ -72,7 +72,9 @@ int32 LinearCgd(const LinearCgdOptions &opts,
 template<typename Real>
 class QuasiNewton {
   public:
-    QuasiNewton(int memory, MatrixIndexT dim);
+    QuasiNewton(): k_(0) {}
+
+    void set(int memory, MatrixIndexT dim);
 
     void reset();
 

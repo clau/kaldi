@@ -31,8 +31,9 @@ namespace kaldi {
 // QuasiNewton
 
 template<typename Real>
-QuasiNewton<Real>::QuasiNewton(int memory, MatrixIndexT dim):
-  memory_(memory), dim_(dim), k_(0) {
+void QuasiNewton<Real>::set(int memory, MatrixIndexT dim) {
+  memory_ = memory;
+  dim_ = dim;
   data_.Resize(2 * memory, dim);
   direction_.Resize(dim);
 }
@@ -93,7 +94,8 @@ QuasiNewton<Real>::two_loop(const VectorBase<Real> &gradient)  {
 
 template<typename Real>
 OptimizeAdaQn<Real>::OptimizeAdaQn(const VectorBase<Real> &x,
-                                   const AdaQnOptions &opts) {
+                                   const AdaQnOptions &opts):
+    opts_(opts), k_(1), t_(-1), fi_(0) {
   MatrixIndexT dim = x.Dim();
   KALDI_ASSERT(dim > 0);
   x_ = x;      // this is the value of x_k
@@ -102,7 +104,7 @@ OptimizeAdaQn<Real>::OptimizeAdaQn(const VectorBase<Real> &x,
   best_f_ = (opts.minimize ? 1 : -1 ) * std::numeric_limits<Real>::infinity();
   best_x_ = x_;
   // 
-  // qn_ = QuasiNewton<Real>(opts_.lbfgs_memory, dim);
+  qn_.set(opts_.lbfgs_memory, dim);
   // 
   x_s_.Resize(dim);
   x_o_.Resize(dim);
@@ -1148,10 +1150,10 @@ int32 LinearCgd(const LinearCgdOptions &opts,
 } 
     
 // Instantiate the class for float and double.
-// template
-// class QuasiNewton<float>;
-// template
-// class QuasiNewton<double>;
+template
+class QuasiNewton<float>;
+template
+class QuasiNewton<double>;
 
 template
 class OptimizeAdaQn<float>;
