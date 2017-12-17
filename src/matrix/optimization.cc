@@ -216,8 +216,6 @@ void OptimizeAdaQn<Real>::RunLbfgs(const VectorBase<Real> &gradient)  {
     Real beta = rho_(i % m) * VecVec(Y(i), lbfgs_direction_); // \beta <-- \rho_i y_i^T r
     lbfgs_direction_.AddVec(alpha_(i % m) - beta, S(i)); // r <-- r + s_i (\alpha_i - \beta)
   }
-
-  return lbfgs_direction_;
 }
 
 // AdaQN
