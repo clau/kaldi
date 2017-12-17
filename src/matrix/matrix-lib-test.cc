@@ -4851,8 +4851,8 @@ template<typename Real> static void MatrixUnitTest(bool full_test) {
   UnitTestPca2<Real>(full_test);
   UnitTestAddVecVec<Real>();
   UnitTestReplaceValue<Real>();
-  The next one is slow.  The upshot is that Eig is up to ten times faster
-  than SVD.
+  // The next one is slow.  The upshot is that Eig is up to ten times faster
+  // than SVD.
   UnitTestSvdSpeed<Real>();
   KALDI_LOG << " Point K";
   UnitTestTriVecSolver<Real>();
