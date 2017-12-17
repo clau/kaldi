@@ -74,8 +74,10 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
   // x_s_ += x_
   x_s_.AddVec(1.0, x_);
 
-  RunLbfgs(gradient);
-  new_x_.AddVec(-opts_.alpha, lbfgs_direction_);
+  // RunLbfgs(gradient);
+  // new_x_.AddVec(-opts_.alpha, lbfgs_direction_);
+
+  new_x_.AddVec(-opts_.alpha, gradient);
 
   if (k_ % opts_.L == 0) {
     t_++;
