@@ -95,7 +95,7 @@ class QuasiNewton {
     }
     SubVector<Real> S(MatrixIndexT i) {
       return SubVector<Real>(data_, (i % dim_) * 2 + 1); // vector s_i
-    }
+    };
 }
 
 /**
@@ -119,7 +119,7 @@ struct AdaQnOptions {
     lbfgs_memory(10),
     fisher_memory(10),
     avg_step_length(4) {}
-}
+};
 
 template<typename Real>
 class OptimizeAdaQn {
