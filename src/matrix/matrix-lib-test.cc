@@ -3127,15 +3127,19 @@ template<typename Real> static void UnitTestLsfl() {
   AssertEqual(Hg(2), 42);
 }
 
-template<typename Real> static Real GetFunctionValue(Real sign,
-                                                     Real c,
-                                                     const Vector<Real> &x,
-                                                     const Vector<Real> &v,
-                                                     const SpMatrix<Real> &S) {
-  Real logf = VecVec(x, v) - 0.5 * VecSpVec(x, S, x);
-  Real f = Exp(c * logf);
-  f *= sign;
-  return f;
+// template<typename Real> static Real GetFunctionValue(Real sign,
+//                                                      Real c,
+//                                                      const Vector<Real> &x,
+//                                                      const Vector<Real> &v,
+//                                                      const SpMatrix<Real> &S) {
+//   Real logf = VecVec(x, v) - 0.5 * VecSpVec(x, S, x);
+//   Real f = Exp(c * logf);
+//   f *= sign;
+//   return f;
+// }
+
+template<typename Real> static Real GetFunctionValue() {
+  return 1.0;
 }
 
 template<typename Real> static void UnitTestAdaQn() {
@@ -3172,15 +3176,19 @@ template<typename Real> static void UnitTestAdaQn() {
       dlogf_dx.AddSpVec(-1.0, S, x, 1.0);
       KALDI_VLOG(2) << "Gradient magnitude is " << dlogf_dx.Norm(2.0);
       Vector<Real> df_dx(dlogf_dx);
-      Real f = GetFunctionValue(sign, c, x, v, S);
+      // Real f = GetFunctionValue(sign, c, x, v, S);
+      Real f = GetFunctionValue();
       df_dx.Scale(f * c); // comes from derivative of the exponential function.
 
       bool reset_fisher_memory = false;
       if (opt_adaqn.ShouldResetFisherMemory()) {
         const VectorBase<Real> &x_o = opt_adaqn.GetLastCheckpointedValue();
         const VectorBase<Real> &x_n = opt_adaqn.GetAverageValueSinceCheckpoint();
-        Real f_o = GetFunctionValue(sign, c, x_o, v, S);
-        Real f_n = GetFunctionValue(sign, c, x_n, v, S);
+        // Real f_o = GetFunctionValue(sign, c, x_o, v, S);
+        // Real f_n = GetFunctionValue(sign, c, x_n, v, S);
+        Real f_o = GetFunctionValue();
+        Real f_n = GetFunctionValue();
+
         reset_fisher_memory = f_n > 1.01 * f_o;
       }
 
