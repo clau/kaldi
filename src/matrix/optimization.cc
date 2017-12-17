@@ -107,6 +107,7 @@ OptimizeAdaQn<Real>::OptimizeAdaQn(const VectorBase<Real> &x,
   // 
   x_s_.Resize(dim);
   x_o_.Resize(dim);
+  x_n_.Resize(dim);
   // 
   fisher_data_.Resize(opts_.fisher_memory, dim);
 }
@@ -139,8 +140,8 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
     t_++;
 
     // x_n = x_s / L
-    Vector<Real> x_n(x_s_);
-    x_n.Scale(1.0 / opts_.L);
+    x_n_.CopyFromVec(x_s_);
+    x_n_.Scale(1.0 / opts_.L);
     
     // x_s = 0;
     x_s_.SetZero();
@@ -156,7 +157,7 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
       }
       else {  
         // s = x_n - x_o;
-        Vector<Real> s(x_n);
+        Vector<Real> s(x_n_);
         s.AddVec(-1.0, x_o_);
 
         // y = fisher * fisher' * s / len(fisher);
@@ -177,12 +178,12 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
         Real rho = VecVec(s, y) / VecVec(y, y);
         if (rho > 1e-4) {
           qn.store(s, y);
-          x_o_.CopyFromVec(x_n);
+          x_o_.CopyFromVec(x_n_);
         }
       }
     }
     else {
-      x_o_.CopyFromVec(x_n);
+      x_o_.CopyFromVec(x_n_);
     }
   }
 

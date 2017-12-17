@@ -164,10 +164,10 @@ class OptimizeAdaQn {
   }
 
   const VectorBase<Real>& GetAverageValueSinceCheckpoint() {
-    Vector<Real> x_n(x_s_);
-    x_n.AddVec(1.0, new_x_);
-    x_n.Scale(1.0 / opts_.L);
-    return x_n;
+    x_n_.CopyFromVec(x_s_);
+    x_n_.AddVec(1.0, new_x_);
+    x_n_.Scale(1.0 / opts_.L);
+    return x_n_;
   }
     
  private:
@@ -194,6 +194,7 @@ class OptimizeAdaQn {
 
   Vector<Real> x_s_;
   Vector<Real> x_o_;
+  Vector<Real> x_n_;
 
   Vector<Real> x_;      // current x.
   Vector<Real> new_x_;  // the x proposed in the line search.
