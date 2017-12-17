@@ -191,11 +191,11 @@ class OptimizeAdaQn {
   Vector<Real> q_;
 
   SubVector<Real> Y(MatrixIndexT i) {
-    return SubVector<Real>(lbfgs_data_, (i % dim_) * 2); // vector y_i
+    return SubVector<Real>(lbfgs_data_, (i % opts_.lbfgs_memory) * 2); // vector y_i
   };
 
   SubVector<Real> S(MatrixIndexT i) {
-    return SubVector<Real>(lbfgs_data_, (i % dim_) * 2 + 1); // vector s_i
+    return SubVector<Real>(lbfgs_data_, (i % opts_.lbfgs_memory) * 2 + 1); // vector s_i
   };
 
 };

@@ -204,8 +204,8 @@ OptimizeAdaQn<Real>::RunLbfgs(const VectorBase<Real> &gradient)  {
   if (k == 0) {
     lbfgs_direction_.CopyFromVec(q_);
   } else {
-    SubVector<Real> y_km1 = Y(k_-1);
-    double gamma_k = VecVec(S(k_-1), y_km1) / VecVec(y_km1, y_km1);
+    SubVector<Real> y_km1 = Y(k-1);
+    double gamma_k = VecVec(S(k-1), y_km1) / VecVec(y_km1, y_km1);
     lbfgs_direction_.SetZero();
     lbfgs_direction_.AddVec(gamma_k, q_);  // r <-- H_k^{(0)} q.
   }
