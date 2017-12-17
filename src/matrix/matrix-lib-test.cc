@@ -3129,8 +3129,8 @@ template<typename Real> static void UnitTestLsfl() {
 
 template<typename Real> static Real GetFunctionValue(Real sign,
                                                      Real c,
-                                                     const Vector<Real> &x,
-                                                     const Vector<Real> &v,
+                                                     const VectorBase<Real> &x,
+                                                     const VectorBase<Real> &v,
                                                      const SpMatrix<Real> &S) {
   Real logf = VecVec(x, v) - 0.5 * VecSpVec(x, S, x);
   Real f = Exp(c * logf);
