@@ -184,8 +184,7 @@ void OptimizeAdaQn<Real>::UpdateLbfgs(const VectorBase<Real> &s, const VectorBas
 }
 
 template<typename Real>
-const VectorBase<Real>& 
-OptimizeAdaQn<Real>::RunLbfgs(const VectorBase<Real> &gradient)  {
+void OptimizeAdaQn<Real>::RunLbfgs(const VectorBase<Real> &gradient)  {
 
   SignedMatrixIndexT m = opts_.lbfgs_memory, k = lbfgs_i_;
   // The rest of this is computing p_k <-- - H_k \nabla f_k using Algorithm
