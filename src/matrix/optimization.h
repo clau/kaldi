@@ -108,8 +108,8 @@ struct AdaQnOptions {
 
   float alpha;
   int L;
-  int fisher_memory;
   int lbfgs_memory;
+  int fisher_memory;
   int avg_step_length; // number of iters to avg step length over, in
   // RecentStepLength().
 
@@ -184,7 +184,7 @@ class OptimizeAdaQn {
 
   AdaQnOptions opts_;
 
-  QuasiNewton qn_;
+  QuasiNewton<Real> qn_;
 
   SignedMatrixIndexT k_; // Iteration number, starts from zero.  Gets set back to zero
   // when we restart.
