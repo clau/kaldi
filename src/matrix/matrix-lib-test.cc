@@ -3138,8 +3138,10 @@ template<typename Real> static void UnitTestLsfl() {
 //   return f;
 // }
 
+
 template<typename Real> static Real GetFunctionValue() {
-  return 1.0;
+  Real a = 1.0;
+  return a;
 }
 
 template<typename Real> static void UnitTestAdaQn() {
