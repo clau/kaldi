@@ -28,6 +28,201 @@
 
 namespace kaldi {
 
+// QuasiNewton
+
+template<typename Real>
+QuasiNewton<Real>::QuasiNewton(int memory, MatrixIndexT dim):
+  memory_(memory), dim_(dim), k_(0) {
+  data_.Resize(2 * memory, dim);
+  direction_.Resize(dim);
+}
+
+template<typename Real>
+QuasiNewton<Real>::reset()  {
+  data_.SetZero();
+  direction_.SetZero();
+  k_ = 0;
+}
+
+template<typename Real>
+QuasiNewton<Real>::store(const VectorBase<Real> &s, const VectorBase<Real> &y)  {
+  S(i_).CopyFromVec(s);
+  Y(i_).CopyFromVec(y);
+  k_++;
+}
+
+template<typename Real>
+const VectorBase<Real>& 
+QuasiNewton<Real>::two_loop(const VectorBase<Real> &gradient)  {
+
+  SignedMatrixIndexT m = memory_, k = k_;
+  // The rest of this is computing p_k <-- - H_k \nabla f_k using Algorithm
+  // 7.4 of N&W.
+
+  Vector<Real> alpha(dim_), rho(dim_);
+
+  // for i = k - 1, k - 2, ... k - m
+  for (SignedMatrixIndexT i = k - 1;
+       i >= std::max(k - m, static_cast<SignedMatrixIndexT>(0));
+       i--) { 
+    alpha(i % m) = rho(i % m) * VecVec(S(i), q); // \alpha_i <-- \rho_i s_i^T q.
+    q.AddVec(-alpha(i % m), Y(i)); // q <-- q - \alpha_i y_i
+  }
+
+  if (k == 0) {
+    direction_.CopyFromVec(gradient);
+  } else {
+    SubVector<Real> y_km1 = Y(k_-1);
+    double gamma_k = VecVec(S(k_-1), y_km1) / VecVec(y_km1, y_km1);
+    direction_.SetZero();
+    direction_.AddVec(gamma_k, gradient);  // r <-- H_k^{(0)} q.
+  }
+
+  // for k = k - m, k - m + 1, ... , k - 1
+  for (SignedMatrixIndexT i = std::max(k - m, static_cast<SignedMatrixIndexT>(0));
+       i < k;
+       i++) {
+    Real beta = rho(i % m) * VecVec(Y(i), r); // \beta <-- \rho_i y_i^T r
+    direction_.AddVec(alpha(i % m) - beta, S(i)); // r <-- r + s_i (\alpha_i - \beta)
+  }
+
+  return direction_;
+}
+
+// AdaQN
+
+template<typename Real>
+OptimizeAdaQn<Real>::OptimizeAdaQn(const VectorBase<Real> &x,
+                                   const AdaQnOptions &opts):
+    opts_(opts), k_(1), t_(-1), fi_(0) {
+  MatrixIndexT dim = x.Dim();
+  KALDI_ASSERT(dim > 0);
+  x_ = x;      // this is the value of x_k
+  new_x_ = x;  // this is where we'll evaluate the function next.
+  // Just set best_f_ to some invalid value, as we haven't yet set it.
+  best_f_ = (opts.minimize ? 1 : -1 ) * std::numeric_limits<Real>::infinity();
+  best_x_ = x_;
+  // 
+  qn_ = QuasiNewton(opts_.lbfgs_memory, dim);
+  // 
+  x_s_.Resize(dim);
+  x_o_.Resize(dim);
+  // 
+  fisher_data_.Resize(opts_.fisher_memory, dim);
+}
+
+template<typename Real>
+void OptimizeAdaQn<Real>::DoStep(Real function_value,
+                                 const VectorBase<Real> &gradient,
+                                 bool reset_fisher_memory) {
+  if (opts_.minimize ? function_value < best_f_ : function_value > best_f_) {
+    best_f_ = function_value;
+    best_x_.CopyFromVec(new_x_);
+  }
+
+  // Record step
+  Vector<Real> sd(new_x_);
+  sd.AddVec(-1.0, x_);
+  RecordStepLength(sd.Norm(2.0));
+
+  x_.CopyFromVec(new_x_);
+
+  // Fisher Memory
+  F(fi_++ % opts_.fisher_memory).CopyFromVec(gradient);
+
+  // x_s_ += x_
+  x_s_.AddVec(1.0, x_);
+
+  new_x_.AddVec(-opts_.alpha, qn.two_loop(gradient));
+
+  if (k_ % opts_.L == 0) {
+    t_++;
+
+    // x_n = x_s / L
+    Vector<Real> x_n(x_s_);
+    x_n.Scale(1.0 / opts_.L);
+    
+    // x_s = 0;
+    x_s_.SetZero();
+
+    if (t_ > 0) {
+      // LCW
+      // f(x_n) > 1.01*f(x_o_)
+      if (reset_fisher_memory) {
+        qn.reset();
+        new_x_.CopyFromVec(x_o_);
+        // reset fisher memory
+        fi_ = 0;
+      }
+      else {  
+        // s = x_n - x_o;
+        Vector<Real> s(x_n);
+        s.AddVec(-1.0, x_o_);
+
+        // y = fisher * fisher' * s / len(fisher);
+        MatrixIndexT dim = Dim();
+        SignedMatrixIndexT f_len = std::min(fi_, static_cast<SignedMatrixIndexT>(opts_.fisher_memory));
+        Matrix<Real> fisher_t(f_len, dim);
+        SignedMatrixIndexT fisher_i = 0;
+        for (SignedMatrixIndexT i = fi - f_len; i < fi; i++) {
+          SubVector<Real> f_row(fisher_t, fisher_i++);
+          f_row.CopyFromVec(F(i));
+        }
+
+        Vector<Real> y(dim);
+        y.AddMatVec(1.0, fisher_t, kNoTrans, s, 0.0);
+        y.AddMatVec(1.0, fisher_t, kTrans, y, 0.0);
+        y.Scale(1.0 / f_len);
+
+        Real rho = VecVec(s, y) / VecVec(y, y);
+        if (rho > 1e-4) {
+          qn.store(s, y);
+          x_o_.CopyFromVec(x_n);
+        }
+      }
+    }
+    else {
+      x_o_.CopyFromVec(x_n);
+    }
+  }
+
+  k_++;
+}
+
+template<typename Real>
+void OptimizeAdaQn<Real>::RecordStepLength(Real s) {
+  step_lengths_.push_back(s);
+  if (step_lengths_.size() > static_cast<size_t>(opts_.avg_step_length))
+    step_lengths_.erase(step_lengths_.begin(), step_lengths_.begin() + 1);
+}
+
+
+template<typename Real>
+Real OptimizeAdaQn<Real>::RecentStepLength() const {
+  size_t n = step_lengths_.size();
+  if (n == 0) return std::numeric_limits<Real>::infinity();
+  else {
+    if (n >= 2 && step_lengths_[n-1] == 0.0 && step_lengths_[n-2] == 0.0)
+      return 0.0; // two zeros in a row means repeated restarts, which is
+    // a loop.  Short-circuit this by returning zero.
+    Real avg = 0.0;
+    for (size_t i = 0; i < n; i++)
+      avg += step_lengths_[i] / n;
+    return avg;
+  }
+}
+
+template<typename Real>
+const VectorBase<Real>&
+OptimizeAdaQn<Real>::GetValue(Real *objf_value) const {
+  if (objf_value != NULL) *objf_value = best_f_;
+  return best_x_;
+}
+
+
+// AdaQN
+
+
 // Gd
 
 template<typename Real>
@@ -953,6 +1148,16 @@ int32 LinearCgd(const LinearCgdOptions &opts,
 } 
     
 // Instantiate the class for float and double.
+template
+class QuasiNewton<float>;
+template
+class QuasiNewton<double>;
+
+template
+class OptimizeAdaQn<float>;
+template
+class OptimizeAdaQn<double>;
+
 template
 class OptimizeGd<float>;
 template

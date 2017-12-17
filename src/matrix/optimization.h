@@ -66,6 +66,152 @@ int32 LinearCgd(const LinearCgdOptions &opts,
 
 
 /**
+  LBFGS Helper Class
+*/
+
+template<typename Real>
+class QuasiNewton {
+  public:
+    QuasiNewton(int memory, MatrixIndexT dim);
+
+    void reset();
+
+    void store(const VectorBase<Real> &s, const VectorBase<Real> &y);
+
+    const VectorBase<Real>& two_loop(const VectorBase<Real> &gradient);
+
+  private:
+
+    int memory_;
+
+    MatrixIndexT dim_;
+    MatrixIndexT k_;
+
+    Matrix<Real> data_; // dimension (m*2) x dim.  Even rows store
+    Vector<Real> direction_;
+
+    SubVector<Real> Y(MatrixIndexT i) {
+      return SubVector<Real>(data_, (i % dim_) * 2); // vector y_i
+    }
+    SubVector<Real> S(MatrixIndexT i) {
+      return SubVector<Real>(data_, (i % dim_) * 2 + 1); // vector s_i
+    }
+}
+
+/**
+  AdaQn
+*/
+
+struct AdaQnOptions {
+  bool minimize; // if true, we're minimizing, else maximizing
+
+  float alpha;
+  int L;
+  int fisher_memory;
+  int lbfgs_memory;
+  int avg_step_length; // number of iters to avg step length over, in
+  // RecentStepLength().
+
+  AdaQnOptions(bool minimize = true):
+    minimize(minimize),
+    alpha(3.2),
+    L(10),
+    lbfgs_memory(10),
+    fisher_memory(10),
+    avg_step_length(4) {}
+}
+
+template<typename Real>
+class OptimizeAdaQn {
+ public:
+  /// Initializer takes the starting value of x.
+  OptimizeAdaQn(const VectorBase<Real> &x,
+                const AdaQnOptions &opts);
+  
+  /// This returns the value of the variable x that has the best objective
+  /// function so far, and the corresponding objective function value if
+  /// requested.  This would typically be called only at the end.
+  const VectorBase<Real>& GetValue(Real *objf_value = NULL) const;
+  
+  /// This returns the value at which the function wants us
+  /// to compute the objective function and gradient.
+  const VectorBase<Real>& GetProposedValue() const { return new_x_; }
+  
+  /// Returns the average magnitude of the last n steps (but not
+  /// more than the number we have stored).  Before we have taken
+  /// any steps, returns +infinity.  Note: if the most recent
+  /// step length was 0, it returns 0, regardless of the other
+  /// step lengths.  This makes it suitable as a convergence test
+  /// (else we'd generate NaN's).
+  Real RecentStepLength() const;
+
+  /// The user calls this function to provide the class with the
+  /// function and gradient info at the point GetProposedValue().
+  /// If this point is outside the constraints you can set function_value
+  /// to {+infinity,-infinity} for {minimization,maximization} problems.
+  /// In this case the gradient, and also the second derivative (if you call
+  /// the second overloaded version of this function) will be ignored.
+  void DoStep(Real function_value,
+              const VectorBase<Real> &gradient
+              bool reset_fisher_memory);
+
+  bool ShouldResetFisherMemory() {
+    return t_ > 1 && k_ % opts_.fisher_memory == 0;
+  }
+
+  const VectorBase<Real>& GetLastCheckpointedValue() {
+    return x_o_;
+  }
+
+  const VectorBase<Real>& GetAverageValueSinceCheckpoint() {
+    Vector<Real> x_n(x_s_);
+    x_n.AddVec(1.0, new_x_);
+    x_n.Scale(1.0 / opts_.L);
+    return x_n;
+  }
+    
+ private:
+  KALDI_DISALLOW_COPY_AND_ASSIGN(OptimizeGd);
+  
+  inline MatrixIndexT Dim() { return x_.Dim(); }
+
+  SubVector<Real> F(MatrixIndexT i) {
+    return SubVector<Real>(fisher_data_, i); // vector y_i
+  }
+
+  void RecordStepLength(Real s);
+
+  AdaQnOptions opts_;
+
+  QuasiNewton qn_;
+
+  SignedMatrixIndexT k_; // Iteration number, starts from zero.  Gets set back to zero
+  // when we restart.
+  SignedMatrixIndexT t_;
+
+  Matrix<Real> fisher_data_;
+  SignedMatrixIndexT fi_;
+
+  Vector<Real> x_s_;
+  Vector<Real> x_o_;
+
+  Vector<Real> x_;      // current x.
+  Vector<Real> new_x_;  // the x proposed in the line search.
+  Vector<Real> best_x_; // the x with the best objective function so far
+                        // (either the same as x_ or something in the current line search.)
+
+  Real best_f_; // the best objective function so far.
+
+
+  std::vector<Real> step_lengths_; // The step sizes we took on the last
+  // (up to m) iterations; these are not stored in a rotating buffer but
+  // are shifted by one each time (this is more convenient when we
+  // restart, as we keep this info past restarting).
+
+};
+
+
+/**
   GD
 */
 
@@ -80,7 +226,6 @@ struct GdOptions {
       step_rate(0.1),
       momentum(0.0) { }
 };
-
 
 template<typename Real>
 class OptimizeGd {
@@ -105,7 +250,7 @@ class OptimizeGd {
   /// step lengths.  This makes it suitable as a convergence test
   /// (else we'd generate NaN's).
   Real RecentStepLength() const;
-  
+
   /// The user calls this function to provide the class with the
   /// function and gradient info at the point GetProposedValue().
   /// If this point is outside the constraints you can set function_value
