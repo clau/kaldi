@@ -152,7 +152,7 @@ class OptimizeAdaQn {
   /// In this case the gradient, and also the second derivative (if you call
   /// the second overloaded version of this function) will be ignored.
   void DoStep(Real function_value,
-              const VectorBase<Real> &gradient
+              const VectorBase<Real> &gradient,
               bool reset_fisher_memory);
 
   bool ShouldResetFisherMemory() {
