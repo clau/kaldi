@@ -58,8 +58,8 @@ QuasiNewton<Real>::two_loop(const VectorBase<Real> &gradient)  {
   SignedMatrixIndexT m = memory_, k = k_;
   // The rest of this is computing p_k <-- - H_k \nabla f_k using Algorithm
   // 7.4 of N&W.
-
   Vector<Real> alpha(dim_), rho(dim_);
+  Vector<Real> q(gradient);
 
   // for i = k - 1, k - 2, ... k - m
   for (SignedMatrixIndexT i = k - 1;
@@ -134,7 +134,7 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
   // x_s_ += x_
   x_s_.AddVec(1.0, x_);
 
-  new_x_.AddVec(-opts_.alpha, qn.two_loop(gradient));
+  new_x_.AddVec(-opts_.alpha, qn_.two_loop(gradient));
 
   if (k_ % opts_.L == 0) {
     t_++;
