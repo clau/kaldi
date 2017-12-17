@@ -3179,7 +3179,7 @@ template<typename Real> static void UnitTestAdaQn() {
       KALDI_VLOG(2) << "Gradient magnitude is " << dlogf_dx.Norm(2.0);
       Vector<Real> df_dx(dlogf_dx);
       // Real f = GetFunctionValue(sign, c, x, v, S);
-      Real f = GetFunctionValue();
+      Real f = GetFunctionValue<Real>();
       df_dx.Scale(f * c); // comes from derivative of the exponential function.
 
       bool reset_fisher_memory = false;
@@ -3188,8 +3188,8 @@ template<typename Real> static void UnitTestAdaQn() {
         const VectorBase<Real> &x_n = opt_adaqn.GetAverageValueSinceCheckpoint();
         // Real f_o = GetFunctionValue(sign, c, x_o, v, S);
         // Real f_n = GetFunctionValue(sign, c, x_n, v, S);
-        Real f_o = GetFunctionValue();
-        Real f_n = GetFunctionValue();
+        Real f_o = GetFunctionValue<Real>();
+        Real f_n = GetFunctionValue<Real>();
 
         reset_fisher_memory = f_n > 1.01 * f_o;
       }
