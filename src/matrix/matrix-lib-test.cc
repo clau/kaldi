@@ -3173,6 +3173,7 @@ template<typename Real> static void UnitTestAdaQn() {
       KALDI_VLOG(2) << "Gradient magnitude is " << dlogf_dx.Norm(2.0);
       Vector<Real> df_dx(dlogf_dx);
       Real f = GetFunctionValue<Real>(sign, c, x, v, S);
+      KALDI_VLOG(2) << "Current loss is " << f;
       df_dx.Scale(f * c); // comes from derivative of the exponential function.
 
       bool reset_fisher_memory = false;
