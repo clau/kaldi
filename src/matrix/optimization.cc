@@ -38,14 +38,14 @@ QuasiNewton<Real>::QuasiNewton(int memory, MatrixIndexT dim):
 }
 
 template<typename Real>
-QuasiNewton<Real>::reset()  {
+void QuasiNewton<Real>::reset()  {
   data_.SetZero();
   direction_.SetZero();
   k_ = 0;
 }
 
 template<typename Real>
-QuasiNewton<Real>::store(const VectorBase<Real> &s, const VectorBase<Real> &y)  {
+void QuasiNewton<Real>::store(const VectorBase<Real> &s, const VectorBase<Real> &y)  {
   S(i_).CopyFromVec(s);
   Y(i_).CopyFromVec(y);
   k_++;
