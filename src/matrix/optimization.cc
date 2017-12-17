@@ -103,7 +103,7 @@ OptimizeAdaQn<Real>::OptimizeAdaQn(const VectorBase<Real> &x,
   best_f_ = (opts.minimize ? 1 : -1 ) * std::numeric_limits<Real>::infinity();
   best_x_ = x_;
   // 
-  qn_ = QuasiNewton<Real>(opts_.lbfgs_memory, dim);
+  // qn_ = QuasiNewton<Real>(opts_.lbfgs_memory, dim);
   // 
   x_s_.Resize(dim);
   x_o_.Resize(dim);
