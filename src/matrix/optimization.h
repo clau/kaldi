@@ -92,11 +92,12 @@ class QuasiNewton {
 
     SubVector<Real> Y(MatrixIndexT i) {
       return SubVector<Real>(data_, (i % dim_) * 2); // vector y_i
-    }
+    };
+
     SubVector<Real> S(MatrixIndexT i) {
       return SubVector<Real>(data_, (i % dim_) * 2 + 1); // vector s_i
     };
-}
+};
 
 /**
   AdaQn
