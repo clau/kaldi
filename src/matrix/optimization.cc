@@ -46,8 +46,8 @@ void QuasiNewton<Real>::reset()  {
 
 template<typename Real>
 void QuasiNewton<Real>::store(const VectorBase<Real> &s, const VectorBase<Real> &y)  {
-  S(i_).CopyFromVec(s);
-  Y(i_).CopyFromVec(y);
+  S(k_).CopyFromVec(s);
+  Y(k_).CopyFromVec(y);
   k_++;
 }
 
@@ -70,19 +70,19 @@ QuasiNewton<Real>::two_loop(const VectorBase<Real> &gradient)  {
   }
 
   if (k == 0) {
-    direction_.CopyFromVec(gradient);
+    direction_.CopyFromVec(q);
   } else {
     SubVector<Real> y_km1 = Y(k_-1);
     double gamma_k = VecVec(S(k_-1), y_km1) / VecVec(y_km1, y_km1);
     direction_.SetZero();
-    direction_.AddVec(gamma_k, gradient);  // r <-- H_k^{(0)} q.
+    direction_.AddVec(gamma_k, q);  // r <-- H_k^{(0)} q.
   }
 
   // for k = k - m, k - m + 1, ... , k - 1
   for (SignedMatrixIndexT i = std::max(k - m, static_cast<SignedMatrixIndexT>(0));
        i < k;
        i++) {
-    Real beta = rho(i % m) * VecVec(Y(i), r); // \beta <-- \rho_i y_i^T r
+    Real beta = rho(i % m) * VecVec(Y(i), direction_); // \beta <-- \rho_i y_i^T r
     direction_.AddVec(alpha(i % m) - beta, S(i)); // r <-- r + s_i (\alpha_i - \beta)
   }
 
