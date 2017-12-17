@@ -171,7 +171,7 @@ class OptimizeAdaQn {
   }
     
  private:
-  KALDI_DISALLOW_COPY_AND_ASSIGN(OptimizeGd);
+  KALDI_DISALLOW_COPY_AND_ASSIGN(OptimizeAdaQn);
   
   inline MatrixIndexT Dim() { return x_.Dim(); }
 
