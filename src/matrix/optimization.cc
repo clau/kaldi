@@ -36,6 +36,9 @@ void QuasiNewton<Real>::set(int memory, MatrixIndexT dim) {
   dim_ = dim;
   data_.Resize(2 * memory, dim);
   direction_.Resize(dim);
+  alpha_.Resize(dim);
+  rho_.Resize(dim);
+  q_.Resize(dim);
 }
 
 template<typename Real>
@@ -59,32 +62,32 @@ QuasiNewton<Real>::two_loop(const VectorBase<Real> &gradient)  {
   SignedMatrixIndexT m = memory_, k = k_;
   // The rest of this is computing p_k <-- - H_k \nabla f_k using Algorithm
   // 7.4 of N&W.
-  Vector<Real> alpha(dim_), rho(dim_);
-  Vector<Real> q(gradient);
+
+  q_.CopyFromVec(gradient);
 
   // for i = k - 1, k - 2, ... k - m
   for (SignedMatrixIndexT i = k - 1;
        i >= std::max(k - m, static_cast<SignedMatrixIndexT>(0));
        i--) { 
-    alpha(i % m) = rho(i % m) * VecVec(S(i), q); // \alpha_i <-- \rho_i s_i^T q.
-    q.AddVec(-alpha(i % m), Y(i)); // q <-- q - \alpha_i y_i
+    alpha_(i % m) = rho_(i % m) * VecVec(S(i), q_); // \alpha_i <-- \rho_i s_i^T q.
+    q_.AddVec(-alpha_(i % m), Y(i)); // q <-- q - \alpha_i y_i
   }
 
   if (k == 0) {
-    direction_.CopyFromVec(q);
+    direction_.CopyFromVec(q_);
   } else {
     SubVector<Real> y_km1 = Y(k_-1);
     double gamma_k = VecVec(S(k_-1), y_km1) / VecVec(y_km1, y_km1);
     direction_.SetZero();
-    direction_.AddVec(gamma_k, q);  // r <-- H_k^{(0)} q.
+    direction_.AddVec(gamma_k, q_);  // r <-- H_k^{(0)} q.
   }
 
   // for k = k - m, k - m + 1, ... , k - 1
   for (SignedMatrixIndexT i = std::max(k - m, static_cast<SignedMatrixIndexT>(0));
        i < k;
        i++) {
-    Real beta = rho(i % m) * VecVec(Y(i), direction_); // \beta <-- \rho_i y_i^T r
-    direction_.AddVec(alpha(i % m) - beta, S(i)); // r <-- r + s_i (\alpha_i - \beta)
+    Real beta = rho_(i % m) * VecVec(Y(i), direction_); // \beta <-- \rho_i y_i^T r
+    direction_.AddVec(alpha_(i % m) - beta, S(i)); // r <-- r + s_i (\alpha_i - \beta)
   }
 
   return direction_;

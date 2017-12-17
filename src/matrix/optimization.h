@@ -93,6 +93,10 @@ class QuasiNewton {
     Matrix<Real> data_; // dimension (m*2) x dim.  Even rows store
     Vector<Real> direction_;
 
+    Vector<Real> alpha_;
+    Vector<Real> rho_;
+    Vector<Real> q_;
+
     SubVector<Real> Y(MatrixIndexT i) {
       return SubVector<Real>(data_, (i % dim_) * 2); // vector y_i
     };
