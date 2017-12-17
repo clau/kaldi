@@ -93,8 +93,7 @@ QuasiNewton<Real>::two_loop(const VectorBase<Real> &gradient)  {
 
 template<typename Real>
 OptimizeAdaQn<Real>::OptimizeAdaQn(const VectorBase<Real> &x,
-                                   const AdaQnOptions &opts):
-    opts_(opts), k_(1), t_(-1), fi_(0) {
+                                   const AdaQnOptions &opts) {
   MatrixIndexT dim = x.Dim();
   KALDI_ASSERT(dim > 0);
   x_ = x;      // this is the value of x_k
