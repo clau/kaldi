@@ -167,8 +167,8 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
         }
 
         Vector<Real> y(dim);
-        y.AddMatVec(1.0, fisher_t, kNoTrans, s, 0.0);
-        y.AddMatVec(1.0, fisher_t, kTrans, y, 0.0);
+        y.AddMatVec(1.0, fisher_t, kTrans, s, 0.0);
+        // y.AddMatVec(1.0, fisher_t, kTrans, y, 0.0);
         y.Scale(1.0 / f_len);
 
         Real rho = VecVec(s, y) / VecVec(y, y);
