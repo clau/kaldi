@@ -103,7 +103,7 @@ OptimizeAdaQn<Real>::OptimizeAdaQn(const VectorBase<Real> &x,
   best_f_ = (opts.minimize ? 1 : -1 ) * std::numeric_limits<Real>::infinity();
   best_x_ = x_;
   // 
-  qn_ = QuasiNewton<Real>(opts_.lbfgs_memory, dim);
+  qn_ = QuasiNewton(opts_.lbfgs_memory, dim);
   // 
   x_s_.Resize(dim);
   x_o_.Resize(dim);
@@ -150,7 +150,7 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
       // LCW
       // f(x_n) > 1.01*f(x_o_)
       if (reset_fisher_memory) {
-        qn.reset();
+        qn_.reset();
         new_x_.CopyFromVec(x_o_);
         // reset fisher memory
         fi_ = 0;
@@ -165,7 +165,7 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
         SignedMatrixIndexT f_len = std::min(fi_, static_cast<SignedMatrixIndexT>(opts_.fisher_memory));
         Matrix<Real> fisher_t(f_len, dim);
         SignedMatrixIndexT fisher_i = 0;
-        for (SignedMatrixIndexT i = fi - f_len; i < fi; i++) {
+        for (SignedMatrixIndexT i = fi_ - f_len; i < fi_; i++) {
           SubVector<Real> f_row(fisher_t, fisher_i++);
           f_row.CopyFromVec(F(i));
         }
@@ -177,7 +177,7 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
 
         Real rho = VecVec(s, y) / VecVec(y, y);
         if (rho > 1e-4) {
-          qn.store(s, y);
+          qn_.store(s, y);
           x_o_.CopyFromVec(x_n_);
         }
       }
