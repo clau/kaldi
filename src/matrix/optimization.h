@@ -117,10 +117,10 @@ struct AdaQnOptions {
 
   AdaQnOptions(bool minimize = true):
     minimize(minimize),
-    alpha(3.2),
-    L(10),
-    lbfgs_memory(10),
-    fisher_memory(10),
+    alpha(0.0086),
+    L(16),
+    lbfgs_memory(20),
+    fisher_memory(100),
     avg_step_length(4) {}
 };
 
