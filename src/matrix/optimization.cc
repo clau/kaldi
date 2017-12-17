@@ -122,11 +122,6 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
     best_x_.CopyFromVec(new_x_);
   }
 
-  // Record step
-  Vector<Real> sd(new_x_);
-  sd.AddVec(-1.0, x_);
-  RecordStepLength(sd.Norm(2.0));
-
   x_.CopyFromVec(new_x_);
 
   // Fisher Memory
@@ -187,6 +182,11 @@ void OptimizeAdaQn<Real>::DoStep(Real function_value,
       x_o_.CopyFromVec(x_n_);
     }
   }
+
+  // Record step
+  Vector<Real> sd(new_x_);
+  sd.AddVec(-1.0, x_);
+  RecordStepLength(sd.Norm(2.0));
 
   k_++;
 }
