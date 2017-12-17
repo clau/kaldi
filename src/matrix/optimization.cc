@@ -1149,10 +1149,6 @@ int32 LinearCgd(const LinearCgdOptions &opts,
 } 
     
 // Instantiate the class for float and double.
-template
-class QuasiNewton<float>;
-template
-class QuasiNewton<double>;
 
 template
 class OptimizeAdaQn<float>;
