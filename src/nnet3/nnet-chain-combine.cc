@@ -138,7 +138,7 @@ void NnetChainCombiner::Combine() {
   int32 dim = ParameterDim();
 
   GdOptions gd_opts;
-  gd_opts.minimize = minimize; // This objf has a maximum, not a minimum.
+  gd_opts.minimize = false; // This objf has a maximum, not a minimum.
   
   // LbfgsOptions lbfgs_options;
   // lbfgs_options.minimize = false; // We're maximizing.
