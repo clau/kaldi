@@ -136,11 +136,15 @@ void NnetChainCombiner::Combine() {
   Timer timer;
 
   int32 dim = ParameterDim();
-  LbfgsOptions lbfgs_options;
-  lbfgs_options.minimize = false; // We're maximizing.
-  lbfgs_options.m = dim; // Store the same number of vectors as the dimension
+
+  GdOptions gd_opts;
+  gd_opts.minimize = minimize; // This objf has a maximum, not a minimum.
+  
+  // LbfgsOptions lbfgs_options;
+  // lbfgs_options.minimize = false; // We're maximizing.
+  // lbfgs_options.m = dim; // Store the same number of vectors as the dimension
                          // itself, so this is BFGS.
-  lbfgs_options.first_step_impr = combine_config_.initial_impr;
+  // lbfgs_options.first_step_impr = combine_config_.initial_impr;
 
   Vector<double> params(dim), deriv(dim);
   double objf, initial_objf;
@@ -148,16 +152,19 @@ void NnetChainCombiner::Combine() {
 
   KALDI_LOG << "Number of parameters: " << dim;
 
-  OptimizeLbfgs<double> lbfgs(params, lbfgs_options);
+  OptimizeGd<double> gd(params, gd_opts);
+  // OptimizeLbfgs<double> lbfgs(params, lbfgs_options);
 
   for (int32 i = 0; i < combine_config_.num_iters; i++) {
     timer.Reset();
-    params.CopyFromVec(lbfgs.GetProposedValue());
+    // params.CopyFromVec(lbfgs.GetProposedValue());
+    params.CopyFromVec(gd.GetProposedValue());
     objf = ComputeObjfAndDerivFromParameters(params, &deriv);
     KALDI_VLOG(2) << "Iteration " << i << " params = " << params
                   << ", objf = " << objf << ", deriv = " << deriv;
     if (i == 0) initial_objf = objf;
-    lbfgs.DoStep(objf, deriv);
+    gd.DoStep(objf, deriv);
+    // lbfgs.DoStep(objf, deriv);
 
     KALDI_VLOG(2) << "Iteration " << i << " " << objf << " " << timer.Elapsed();
   }
@@ -180,7 +187,8 @@ void NnetChainCombiner::Combine() {
   // must recompute nnet_ if "params" is not exactly equal to the
   // final params that LB
   Vector<double> final_params(dim);
-  final_params.CopyFromVec(lbfgs.GetValue(&objf));
+  // final_params.CopyFromVec(lbfgs.GetValue(&objf));
+  final_params.CopyFromVec(gd.GetValue(&objf));
   if (!params.ApproxEqual(final_params, 0.0)) {
     // the following call makes sure that nnet_ corresponds to the parameters
     // in "params".

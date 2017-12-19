@@ -214,7 +214,7 @@ struct GdOptions {
   GdOptions (bool minimize = true):
       minimize(minimize),
       step_rate(0.1),
-      momentum(0.0) { }
+      momentum(0.1) { }
 };
 
 template<typename Real>
