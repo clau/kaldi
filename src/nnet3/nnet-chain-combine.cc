@@ -141,6 +141,9 @@ void NnetChainCombiner::Combine() {
   adaqn_opts.minimize = false;
   adaqn_opts.L = 2;
   adaqn_opts.alpha = 0.1;
+  Vector<double> adaqn_df(dim);
+  Vector<double> adaqn_x_o(dim);
+  Vector<double> adaqn_x_n(dim);
 
   // GdOptions gd_opts;
   // gd_opts.minimize = false; // This objf has a maximum, not a minimum.
@@ -154,7 +157,6 @@ void NnetChainCombiner::Combine() {
   Vector<double> params(dim), deriv(dim);
   double objf, initial_objf;
   GetInitialParameters(&params);
-
 
   KALDI_LOG << "AdaQN Number of parameters: " << dim;
 
@@ -174,13 +176,12 @@ void NnetChainCombiner::Combine() {
 
     bool reset_fisher_memory = false;
     if (adaqn.ShouldResetFisherMemory()) {
-      Vector<double> df(dim);
-      const Vector<double> &x_o = adaqn.GetLastCheckpointedValue();
-      const Vector<double> &x_n = adaqn.GetAverageValueSinceCheckpoint();
-      // Vector<double> df
-
-      double f_o = ComputeObjfAndDerivFromParameters(x_o, &df);
-      double f_n = ComputeObjfAndDerivFromParameters(x_n, &df);
+      const VectorBase<double> &x_o = adaqn.GetLastCheckpointedValue();
+      const VectorBase<double> &x_n = adaqn.GetAverageValueSinceCheckpoint();
+      adaqn_x_o.CopyFromVec(x_o);
+      adaqn_x_n.CopyFromVec(x_n);
+      double f_o = ComputeObjfAndDerivFromParameters(adaqn_x_o, &adaqn_df);
+      double f_n = ComputeObjfAndDerivFromParameters(adaqn_x_n, &adaqn_df);
       reset_fisher_memory = f_n > 1.01 * f_o;
     }
     adaqn.DoStep(objf, deriv, reset_fisher_memory);
