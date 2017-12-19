@@ -175,8 +175,10 @@ void NnetChainCombiner::Combine() {
     bool reset_fisher_memory = false;
     if (adaqn.ShouldResetFisherMemory()) {
       Vector<double> df(dim);
-      Vector<double> &x_o = adaqn.GetLastCheckpointedValue();
-      Vector<double> &x_n = adaqn.GetAverageValueSinceCheckpoint();
+      const Vector<double> &x_o = adaqn.GetLastCheckpointedValue();
+      const Vector<double> &x_n = adaqn.GetAverageValueSinceCheckpoint();
+      // Vector<double> df
+
       double f_o = ComputeObjfAndDerivFromParameters(x_o, &df);
       double f_n = ComputeObjfAndDerivFromParameters(x_n, &df);
       reset_fisher_memory = f_n > 1.01 * f_o;
