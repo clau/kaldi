@@ -137,8 +137,13 @@ void NnetChainCombiner::Combine() {
 
   int32 dim = ParameterDim();
 
-  GdOptions gd_opts;
-  gd_opts.minimize = false; // This objf has a maximum, not a minimum.
+  AdaQnOptions adaqn_opts;
+  opts.minimize = false;
+  opts.L = 2;
+  opts.alpha = 0.1;
+
+  // GdOptions gd_opts;
+  // gd_opts.minimize = false; // This objf has a maximum, not a minimum.
   
   // LbfgsOptions lbfgs_options;
   // lbfgs_options.minimize = false; // We're maximizing.
@@ -150,20 +155,34 @@ void NnetChainCombiner::Combine() {
   double objf, initial_objf;
   GetInitialParameters(&params);
 
-  KALDI_LOG << "Number of parameters: " << dim;
 
-  OptimizeGd<double> gd(params, gd_opts);
+  KALDI_LOG << "AdaQN Number of parameters: " << dim;
+
+  OptimizeAdaQn<double> adaqn(params, adaqn_opts);
+  // OptimizeGd<double> gd(params, gd_opts);
   // OptimizeLbfgs<double> lbfgs(params, lbfgs_options);
 
   for (int32 i = 0; i < combine_config_.num_iters; i++) {
     timer.Reset();
+    params.CopyFromVec(adaqn.GetProposedValue());
     // params.CopyFromVec(lbfgs.GetProposedValue());
-    params.CopyFromVec(gd.GetProposedValue());
+    // params.CopyFromVec(gd.GetProposedValue());
     objf = ComputeObjfAndDerivFromParameters(params, &deriv);
     KALDI_VLOG(2) << "Iteration " << i << " params = " << params
                   << ", objf = " << objf << ", deriv = " << deriv;
     if (i == 0) initial_objf = objf;
-    gd.DoStep(objf, deriv);
+
+    bool reset_fisher_memory = false;
+    if (adaqn.ShouldResetFisherMemory()) {
+      Vector<double> df(dim);
+      const VectorBase<double> &x_o = adaqn.GetLastCheckpointedValue();
+      const VectorBase<double> &x_n = adaqn.GetAverageValueSinceCheckpoint();
+      double f_o = ComputeObjfAndDerivFromParameters(x_o, &df);
+      double f_n = ComputeObjfAndDerivFromParameters(x_n, &df);
+      reset_fisher_memory = f_n > 1.01 * f_o;
+    }
+    adaqn.DoStep(objf, deriv, reset_fisher_memory);
+    // gd.DoStep(objf, deriv);
     // lbfgs.DoStep(objf, deriv);
 
     KALDI_VLOG(2) << "Iteration " << i << " " << objf << " " << timer.Elapsed();
@@ -187,8 +206,9 @@ void NnetChainCombiner::Combine() {
   // must recompute nnet_ if "params" is not exactly equal to the
   // final params that LB
   Vector<double> final_params(dim);
+  final_params.CopyFromVec(adaqn.GetValue(&objf));
+  // final_params.CopyFromVec(gd.GetValue(&objf));
   // final_params.CopyFromVec(lbfgs.GetValue(&objf));
-  final_params.CopyFromVec(gd.GetValue(&objf));
   if (!params.ApproxEqual(final_params, 0.0)) {
     // the following call makes sure that nnet_ corresponds to the parameters
     // in "params".
