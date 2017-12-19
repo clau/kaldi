@@ -138,9 +138,9 @@ void NnetChainCombiner::Combine() {
   int32 dim = ParameterDim();
 
   AdaQnOptions adaqn_opts;
-  opts.minimize = false;
-  opts.L = 2;
-  opts.alpha = 0.1;
+  adaqn_opts.minimize = false;
+  adaqn_opts.L = 2;
+  adaqn_opts.alpha = 0.1;
 
   // GdOptions gd_opts;
   // gd_opts.minimize = false; // This objf has a maximum, not a minimum.
