@@ -139,8 +139,8 @@ void NnetChainCombiner::Combine() {
 
   AdaQnOptions adaqn_opts;
   adaqn_opts.minimize = false;
-  adaqn_opts.L = 5;
-  // adaqn_opts.alpha = 0.1;
+  adaqn_opts.L = 3;
+  adaqn_opts.alpha = 0.001;
   Vector<double> adaqn_df(dim);
   Vector<double> adaqn_x_o(dim);
   Vector<double> adaqn_x_n(dim);
