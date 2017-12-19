@@ -139,8 +139,8 @@ void NnetChainCombiner::Combine() {
 
   AdaQnOptions adaqn_opts;
   adaqn_opts.minimize = false;
-  adaqn_opts.L = 2;
-  adaqn_opts.alpha = 0.1;
+  adaqn_opts.L = 3;
+  // adaqn_opts.alpha = 0.1;
   Vector<double> adaqn_df(dim);
   Vector<double> adaqn_x_o(dim);
   Vector<double> adaqn_x_n(dim);
@@ -189,6 +189,9 @@ void NnetChainCombiner::Combine() {
     // lbfgs.DoStep(objf, deriv);
 
     KALDI_VLOG(2) << "Iteration " << i << " " << objf << " " << timer.Elapsed();
+    double best;
+    adaqn.GetValue(&best);
+    KALDI_VLOG(2) << "Best objf " << best;
   }
 
   if (!combine_config_.sum_to_one_penalty) {
