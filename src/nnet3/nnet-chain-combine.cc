@@ -177,8 +177,8 @@ void NnetChainCombiner::Combine() {
       Vector<double> df(dim);
       const VectorBase<double> &x_o = adaqn.GetLastCheckpointedValue();
       const VectorBase<double> &x_n = adaqn.GetAverageValueSinceCheckpoint();
-      double f_o = ComputeObjfAndDerivFromParameters(x_o, &df);
-      double f_n = ComputeObjfAndDerivFromParameters(x_n, &df);
+      double f_o = ComputeObjfAndDerivFromParameters(*x_o, &df);
+      double f_n = ComputeObjfAndDerivFromParameters(*x_n, &df);
       reset_fisher_memory = f_n > 1.01 * f_o;
     }
     adaqn.DoStep(objf, deriv, reset_fisher_memory);
