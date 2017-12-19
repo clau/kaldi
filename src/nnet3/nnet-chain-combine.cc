@@ -19,6 +19,7 @@
 
 #include "nnet3/nnet-chain-combine.h"
 #include "nnet3/nnet-utils.h"
+#include "base/timer.h"
 
 namespace kaldi {
 namespace nnet3 {
@@ -132,6 +133,8 @@ void NnetChainCombiner::Combine() {
     SelfTestModelDerivatives();
   }
 
+  Timer timer;
+
   int32 dim = ParameterDim();
   LbfgsOptions lbfgs_options;
   lbfgs_options.minimize = false; // We're maximizing.
@@ -143,16 +146,20 @@ void NnetChainCombiner::Combine() {
   double objf, initial_objf;
   GetInitialParameters(&params);
 
+  KALDI_LOG << "Number of parameters: " << dim;
 
   OptimizeLbfgs<double> lbfgs(params, lbfgs_options);
 
   for (int32 i = 0; i < combine_config_.num_iters; i++) {
+    timer.Reset();
     params.CopyFromVec(lbfgs.GetProposedValue());
     objf = ComputeObjfAndDerivFromParameters(params, &deriv);
     KALDI_VLOG(2) << "Iteration " << i << " params = " << params
                   << ", objf = " << objf << ", deriv = " << deriv;
     if (i == 0) initial_objf = objf;
     lbfgs.DoStep(objf, deriv);
+
+    KALDI_VLOG(2) << "Iteration " << i << " " << objf << " " << timer.Elapsed;
   }
 
   if (!combine_config_.sum_to_one_penalty) {
