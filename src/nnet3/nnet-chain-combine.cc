@@ -159,7 +159,7 @@ void NnetChainCombiner::Combine() {
     if (i == 0) initial_objf = objf;
     lbfgs.DoStep(objf, deriv);
 
-    KALDI_VLOG(2) << "Iteration " << i << " " << objf << " " << timer.Elapsed;
+    KALDI_VLOG(2) << "Iteration " << i << " " << objf << " " << timer.Elapsed();
   }
 
   if (!combine_config_.sum_to_one_penalty) {
